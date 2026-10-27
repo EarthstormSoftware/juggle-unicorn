@@ -4,3 +4,6 @@
 *.html text eol=lf
 *.ps1  text
 *.md   text
+
+# Everything here goes to the Pi, and base/VERSION has the base's hashes: LF on every checkout
+app/** text eol=lf

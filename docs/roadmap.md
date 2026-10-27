@@ -83,6 +83,8 @@ it has no clock settings of its own.
 ### 5. Finish
 
 README, tests, the first release, and a Pi running it.
+v0.1.0 (2026-10-27), on App Base v0.1.0. It needs ApplPi OS v0.4 (`rpi_ws281x` and `"pwm"`), so it's
+published when that is.
 
 ### 6. Status and alerts
 
