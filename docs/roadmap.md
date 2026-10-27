@@ -28,13 +28,23 @@ As PlasmaStick's, with `Mode` and `ModeParameters`:
 | Colour | opcodes 1-4 | The whole panel one colour, or a white by temperature (`Kelvin`) |
 | Rainbows | new | Rainbow colours moving across the grid |
 | Pulse | opcode 40 | A glow growing and shrinking from the centre, in a colour (purple by default) |
-| F1 Start | opcode 50 | Four pairs of red columns, a second apart, then lights out after a random 4-7 s; then off |
+| F1 Start | opcode 50 | As F1 starts since 2026: the panels flash blue for 5 s (pre-start), the five red lights come on a second apart, and after a random 0.2-3 s they go out; then off. (The 2015 script lit four pairs of columns and waited 4-7 s.) |
 | Pirate Flag | opcode 10 | The skull and crossbones, filling with red row by row, over and over |
-| CPU Chart | opcode 60 | An 8-column history of another device's CPU use (green, orange, red), from its MQTT `info` topic |
+| CPU Chart | opcode 60 | An 8-column history of another device's CPU use (green, orange, red), from a field of its MQTT topic (the `chart` settings) |
 | Status | new | This Pi's temperature and load, and alerts other devices post to it (step 5) |
 
 Animations take a `Speed` (1-10), as PlasmaStick's do. Home Assistant sees a light with RGB colour, colour
 temperature, brightness and the modes as effects.
+
+### Alerts
+
+Asked for on 2026-10-27, for events such as a motion sensor by the door (a doggy doorbell): with the Alerts switch
+on, an alert interrupts whatever the light is doing, on or off, flashing a colour (this long on, this long off) for
+a while at its own brightness, and then the light carries on as it was. The colour, times and brightness are
+settings, and each alert can give its own. Alerts come from the API (`/api/alert`), MQTT (`<base>/alert`), Home
+Assistant (an Alert button, and the Alerts switch), or a watched topic: another device's, such as Pico PIR's state
+topic, where motion starting rings once until it clears. The page has a Test button, which works with the switch
+off. This is App Base's (the light model), so PlasmaStick gets it too.
 
 ### Schedule and groups
 
@@ -61,7 +71,7 @@ The topics, messages and discovery as PlasmaStick's, with an MQTT tab.
 
 ### 3. The modes
 
-Rainbows, Pulse, F1 Start, Pirate Flag and CPU Chart, with fades between them.
+Rainbows, Pulse, F1 Start, Pirate Flag and CPU Chart, and alerts. Checked on the HAT.
 
 ### 4. Schedule and groups
 
@@ -73,5 +83,4 @@ README, tests, the first release, and a Pi running it.
 
 ### 6. Status and alerts
 
-This Pi's temperature and load as a mode, and an API and MQTT topic for alerts that other devices post (a colour,
-an icon or a scrolling word for a while).
+This Pi's temperature and load as a mode, and alerts with more than a colour (an icon or a scrolling word).

@@ -10,7 +10,16 @@ The topics hang off mqtt.topic_base ({name} is the device name) and the discover
   <base>/control       lights: {"MessageType": "StateChange" | "ModeChange" | "BrightnessChange", "Parameters": {...}}
   <base>/ha/state      retained, lights: the state in Home Assistant's JSON light schema
   <base>/ha/set        lights: Home Assistant's JSON light commands
-  <ha_prefix>/light/<name>/config, <ha_prefix>/sensor/<name>/<key>/config   retained discovery (if it's on)
+  <base>/alert         lights: starts an alert (if alerts are switched on): empty, or {"Colour", "Seconds", "OnMs",
+                       "OffMs", "Brightness"} for other than the alert settings; {"Active": false} ends one
+  <base>/alert/set     lights: {"Enabled": true | false} switches alerts on or off
+  <base>/alert/state   retained, lights: {"Enabled", "Active"}
+  <ha_prefix>/light/<name>/config, <ha_prefix>/sensor/<name>/<key>/config, and for alerts .../switch/<name>/alerts
+                       and .../button/<name>/alert: retained discovery (if it's on)
+
+mqtt.alert_topic, if set, is another device's topic to watch: a message on it starts an alert (see watched()), so a
+motion sensor can ring the light like a doorbell. The product can listen to topics of its own (mqtt_topics(device)
+and mqtt_message(device, topic, text)).
 
 Retained topics the device stops using (after a topic setting changes) are cleared when it next connects.
 
@@ -114,8 +123,17 @@ MQTT_SETTINGS = {
         'topic_base': Setting(DEFAULT_TOPIC_BASE, topic_base_error, restart=True),
         'ha_discovery': Setting(False, is_bool, restart=True),
         'ha_prefix': Setting(DEFAULT_HA_PREFIX, ha_prefix_error, restart=True),
+        # Lights: another device's topic whose messages start an alert ('' for none)
+        'alert_topic': Setting('', lambda value: watch_topic_error(value), restart=True),
     },
 }
+
+
+def watch_topic_error(value):
+    """For a topic the device subscribes to: wildcards are allowed."""
+    if not isinstance(value, str) or len(value) > 200 or '\0' in value or value != value.strip():
+        return 'must be a topic, up to 200 characters'
+    return None
 
 
 def topics(name, base=DEFAULT_TOPIC_BASE, ha_prefix=DEFAULT_HA_PREFIX, light=False, sensors=()):
@@ -129,6 +147,11 @@ def topics(name, base=DEFAULT_TOPIC_BASE, ha_prefix=DEFAULT_HA_PREFIX, light=Fal
             'ha_state': base + '/ha/state',
             'ha_set': base + '/ha/set',
             'ha_light': ha_prefix + '/light/' + name + '/config',
+            'alert': base + '/alert',
+            'alert_set': base + '/alert/set',
+            'alert_state': base + '/alert/state',
+            'ha_alerts': ha_prefix + '/switch/' + name + '/alerts/config',
+            'ha_alert': ha_prefix + '/button/' + name + '/alert/config',
         })
     for key in sensors:
         t['ha_sensor_' + key] = ha_prefix + '/sensor/' + name + '/' + key + '/config'
@@ -137,7 +160,7 @@ def topics(name, base=DEFAULT_TOPIC_BASE, ha_prefix=DEFAULT_HA_PREFIX, light=Fal
 
 def retained(t):
     """The topics in t that the device publishes retained."""
-    return sorted(topic for role, topic in t.items() if role not in ('control', 'ha_set'))
+    return sorted(topic for role, topic in t.items() if role not in ('control', 'ha_set', 'alert', 'alert_set'))
 
 
 # Payloads
@@ -190,6 +213,73 @@ def ha_light_payload(name, t, product, modes):
         'effect_list': list(modes),
         'device': _device(name, product),
     })
+
+
+def alert_state_payload(light):
+    return json.dumps({'Enabled': light.settings.get('alert', 'enabled'), 'Active': light.alerting})
+
+
+def ha_alerts_payload(name, t, product):
+    """The switch that turns alerts on and off."""
+    return json.dumps({
+        'name': 'Alerts', 'unique_id': name + '_alerts', 'icon': 'mdi:alarm-light-outline',
+        'command_topic': t['alert_set'], 'payload_on': '{"Enabled": true}', 'payload_off': '{"Enabled": false}',
+        'state_topic': t['alert_state'], 'value_template': "{{ 'ON' if value_json.Enabled else 'OFF' }}",
+        'state_on': 'ON', 'state_off': 'OFF', 'availability_topic': t['status'], 'device': _device(name, product),
+    })
+
+
+def ha_alert_payload(name, t, product):
+    """The button that starts an alert (when they're switched on)."""
+    return json.dumps({
+        'name': 'Alert', 'unique_id': name + '_alert', 'icon': 'mdi:alarm-light', 'command_topic': t['alert'],
+        'payload_press': '{}', 'availability_topic': t['status'], 'device': _device(name, product),
+    })
+
+
+def parse_alert(text):
+    """A message on the alert topic, as keyword arguments for Light.alert, or None to end the alert."""
+    if not text.strip():
+        return {}
+    payload = json.loads(text)
+    if not isinstance(payload, dict):
+        raise ValueError('an alert must be empty or a JSON object')
+    if payload.get('Active') is False:
+        return None
+    names = {'Colour': 'colour', 'Seconds': 'seconds', 'OnMs': 'on_ms', 'OffMs': 'off_ms', 'Brightness': 'brightness'}
+    return {names[k]: v for k, v in payload.items() if k in names}
+
+
+_OFF = ('', '0', 'off', 'false', 'no', 'clear', 'idle', 'closed', 'inactive')
+
+
+def watched(text):
+    """Whether a message on the watched topic means "now": a JSON object with "motion" (Pico PIR's state),
+    "State" or "state" says so itself; true or ON does; false, OFF, 0 or empty doesn't; any other text does."""
+    try:
+        payload = json.loads(text)
+    except ValueError:
+        return text.strip().lower() not in _OFF
+    if isinstance(payload, dict):
+        for key in ('motion', 'State', 'state', 'occupancy'):
+            if key in payload:
+                value = payload[key]
+                return value.strip().lower() not in _OFF if isinstance(value, str) else bool(value)
+        return True
+    if isinstance(payload, str):
+        return payload.strip().lower() not in _OFF
+    return bool(payload)
+
+
+def topic_matches(pattern, topic):
+    """Whether topic is one that the subscription pattern (with + and # wildcards) receives."""
+    wanted, parts = pattern.split('/'), topic.split('/')
+    for i, level in enumerate(wanted):
+        if level == '#':
+            return True
+        if i >= len(parts) or (level != '+' and level != parts[i]):
+            return False
+    return len(parts) == len(wanted)
 
 
 def ha_sensor_payload(name, t, product, key):
@@ -297,6 +387,8 @@ class Mqtt:
         self.sensors = tuple(key for key, _, _ in SENSORS if info.get(key) is not None)
         self.topics = topics(self.name, s.get('mqtt', 'topic_base'), s.get('mqtt', 'ha_prefix'),
                              light=self.light is not None, sensors=self.sensors)
+        self.alert_topic = s.get('mqtt', 'alert_topic') if self.light is not None else ''
+        self._watched_before = False  # whether the watched topic last said "now", so one that stays "now" rings once
         self._changed = asyncio.Event()
         if self.light is not None:
             self.light.listeners.append(lambda light: self._changed.set())
@@ -344,8 +436,17 @@ class Mqtt:
             await client.subscribe(t['control'])
             if self.ha:
                 await client.subscribe(t['ha_set'])
-            await client.publish(t['ha_light'], ha_light_payload(self.name, t, self.device.product, self.light.modes)
-                                 if self.ha else '', retain=True)
+            await client.subscribe(t['alert'])
+            await client.subscribe(t['alert_set'])
+            if self.alert_topic:
+                await client.subscribe(self.alert_topic)
+            product = self.device.product
+            for role, payload in (('ha_light', lambda: ha_light_payload(self.name, t, product, self.light.modes)),
+                                  ('ha_alerts', lambda: ha_alerts_payload(self.name, t, product)),
+                                  ('ha_alert', lambda: ha_alert_payload(self.name, t, product))):
+                await client.publish(t[role], payload() if self.ha else '', retain=True)
+        for topic in self._product_topics():
+            await client.subscribe(topic)
         for key in self.sensors:
             await client.publish(t['ha_sensor_' + key], ha_sensor_payload(self.name, t, self.device.product, key)
                                  if self.ha else '', retain=True)
@@ -369,6 +470,14 @@ class Mqtt:
         if before != current:
             from base.compat import write_atomically
             write_atomically(path, json.dumps(current))
+
+    def _product_topics(self):
+        product = self.device.product
+        return product.mqtt_topics(self.device) if hasattr(product, 'mqtt_topics') else []
+
+    def alert_switched(self):
+        """Publishes the alert state again (the switch changed on the page)."""
+        self._changed.set()
 
     async def _send_info(self, client):
         await client.publish(self.topics['info'], info_payload(self.device.info()), retain=True)
@@ -394,6 +503,7 @@ class Mqtt:
                 await client.publish(self.topics['state'], json.dumps(state), retain=True)
                 if self.ha:
                     await client.publish(self.topics['ha_state'], ha_state_payload(state), retain=True)
+                await client.publish(self.topics['alert_state'], alert_state_payload(self.light), retain=True)
         except OSError:
             client.close()
 
@@ -402,19 +512,46 @@ class Mqtt:
             message = await client.message()
             if message is None:
                 return
-            topic, text, _ = message
+            topic, text, retained = message
             Log.debug(TAG, '{}: {}'.format(topic, text))
             try:
-                payload = json.loads(text)
-                if topic == self.topics.get('control'):
-                    change = parse_control(payload)
-                elif topic == self.topics.get('ha_set'):
-                    change = parse_ha_command(payload, self.light.modes)
-                else:
-                    continue
-            except ValueError as e:
-                Log.warn(TAG, 'Ignoring a message on {}: {}'.format(topic, e))
-                continue
-            error = self.light.set(**change)
+                error = self._handle(topic, text, retained)
+            except (ValueError, AttributeError) as e:
+                error = str(e)
             if error:
                 Log.warn(TAG, 'Ignoring a message on {}: {}'.format(topic, error))
+
+    def _handle(self, topic, text, retained):
+        """Acts on a message; returns why it couldn't, or None. Raises ValueError for one it can't read."""
+        t, light = self.topics, self.light
+        if topic == t.get('control'):
+            return light.set(**parse_control(json.loads(text)))
+        if topic == t.get('ha_set'):
+            return light.set(**parse_ha_command(json.loads(text), light.modes))
+        if topic == t.get('alert'):
+            if retained:  # left on the broker by someone: not an event now
+                return None
+            alert = parse_alert(text)
+            if alert is None:
+                light.stop_alert()
+                return None
+            return light.alert(**alert)
+        if topic == t.get('alert_set'):
+            enabled = json.loads(text).get('Enabled')
+            if not isinstance(enabled, bool):
+                return 'Enabled must be true or false'
+            error, changed = self.device.settings.update({'alert': {'enabled': enabled}})
+            if not error:
+                self.device.applied(changed)
+            self._changed.set()  # the switch's state, even if it didn't change
+            return error
+        if self.alert_topic and topic_matches(self.alert_topic, topic):
+            now = watched(text)
+            ring = now and not self._watched_before and not retained
+            self._watched_before = now
+            if ring and self.device.settings.get('alert', 'enabled'):
+                return light.alert()
+            return None
+        if hasattr(self.device.product, 'mqtt_message'):
+            self.device.product.mqtt_message(self.device, topic, text)
+        return None

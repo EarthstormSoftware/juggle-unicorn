@@ -62,6 +62,7 @@ class Device:
                 'parameters': light.parameters,
                 'brightness': light.brightness,
                 'modes': light.modes,
+                'alert': {'enabled': self.settings.get('alert', 'enabled'), 'active': light.alerting},
             }
         if self.mqtt is not None:
             info['mqtt'] = self.mqtt.status()
@@ -73,6 +74,11 @@ class Device:
         """Settings that changed and apply at once (the rest wait for the restart)."""
         if ('device', 'log_level') in changed:
             Log.level = self.settings.get('device', 'log_level')
+        if ('alert', 'enabled') in changed:
+            # Switching alerts off silences one that's showing
+            if not self.settings.get('alert', 'enabled'):
+                self.light.stop_alert()
+            self.mqtt.alert_switched()
         if hasattr(self.product, 'applied'):
             self.product.applied(self, changed)
 

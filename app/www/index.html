@@ -31,10 +31,12 @@ form:has(#mqtt_enabled:checked) .mqtt-off{display:none}
 <noscript><p class="noscript">This page needs JavaScript. Turn it on for this site, then reload.</p></noscript>
 
 <input type="radio" name="t" id="tc" data-pane="pc" aria-label="Control tab" checked>
+<input type="radio" name="t" id="ta" data-pane="pa" aria-label="Alert tab">
 <input type="radio" name="t" id="tm" data-pane="pm" aria-label="MQTT tab">
 <input type="radio" name="t" id="td" data-pane="pd" aria-label="Device tab">
 <nav>
   <label for="tc">Control</label>
+  <label for="ta">Alert</label>
   <label for="tm">MQTT</label>
   <label for="td">Device</label>
 </nav>
@@ -55,16 +57,84 @@ form:has(#mqtt_enabled:checked) .mqtt-off{display:none}
     <output for="brightness" id="brightness_value"></output>
   </div>
 
-  <div class="sec">Colour</div>
+  <div class="sec">Mode</div>
   <div class="frow">
+    <div class="field"><label for="mode">Mode</label>
+      <select id="mode" aria-describedby="mode_help">
+        <option>Colour</option><option>Rainbows</option><option>Pulse</option>
+        <option>F1 Start</option><option>Pirate Flag</option><option>CPU Chart</option>
+      </select>
+    </div>
+  </div>
+  <p class="note" id="mode_help"></p>
+  <button class="btn-full" id="f1_go" hidden>Start the lights</button>
+  <div class="slider" id="speed_row" hidden>
+    <label for="speed" class="note" style="margin:0">Speed</label>
+    <input type="range" id="speed" min="1" max="10">
+    <output for="speed" id="speed_value"></output>
+  </div>
+  <div class="frow" id="colour_row">
     <div class="field"><label for="colour">Colour</label><input type="color" id="colour"></div>
   </div>
-  <div class="slider">
+  <div class="slider" id="kelvin_row">
     <label for="kelvin" class="note" style="margin:0">White</label>
     <input type="range" id="kelvin" min="2000" max="6500" step="100">
     <output for="kelvin" id="kelvin_value"></output>
   </div>
   <p class="msg" id="control_msg" role="status"></p>
+</div>
+
+<div class="pane" id="pa">
+  <label class="check"><input type="checkbox" id="alerts_on"> Alerts</label>
+  <p class="note">When alerts are on, an alert interrupts whatever the light is doing, even when it's off: it flashes,
+    then the light carries on as it was. Alerts come from the topic below, from Home Assistant's Alert button, or
+    from the API (<code>POST /api/alert</code>) or MQTT (<code>&lt;base&gt;/alert</code>).</p>
+  <div class="power">
+    <button class="btn-full quiet" id="alert_test">Test</button>
+    <button class="btn-full quiet" id="alert_stop">Stop</button>
+  </div>
+  <p class="msg" id="alert_msg" role="status"></p>
+
+  <form class="settings">
+    <div class="cols">
+    <div class="group">
+      <div class="sec">The Alert</div>
+      <div class="frow">
+        <div class="field"><label for="alert_colour">Colour</label>
+          <input type="color" name="alert.colour" id="alert_colour">
+        </div>
+        <div class="field"><label for="alert_seconds">For (s)</label>
+          <input type="number" required name="alert.seconds" id="alert_seconds" min="1" max="3600">
+        </div>
+      </div>
+      <div class="frow">
+        <div class="field"><label for="alert_on">On (ms)</label>
+          <input type="number" required name="alert.on_ms" id="alert_on" min="50" max="10000" step="50">
+        </div>
+        <div class="field"><label for="alert_off">Off (ms)</label>
+          <input type="number" required name="alert.off_ms" id="alert_off" min="0" max="10000" step="50" aria-describedby="flash_help">
+        </div>
+        <div class="field"><label for="alert_brightness">Brightness (%)</label>
+          <input type="number" required name="alert.brightness" id="alert_brightness" min="1" max="100">
+        </div>
+      </div>
+      <p class="note" id="flash_help">Each flash is on, then off, for these times (off 0: steady).</p>
+    </div>
+    <div class="group">
+      <div class="sec">Watch</div>
+      <div class="frow">
+        <div class="field"><label for="alert_topic">MQTT Topic</label>
+          <input type="text" name="mqtt.alert_topic" id="alert_topic" maxlength="200" placeholder="none" aria-describedby="watch_help" spellcheck="false" autocapitalize="off">
+        </div>
+      </div>
+      <p class="note" id="watch_help">Another device's topic, such as a motion sensor's <code>/home/device/pir/state</code>:
+        an alert starts when it says something has happened (motion true, ON, true, or any other message), once
+        until it clears. Needs MQTT; saving a new topic restarts the app.</p>
+    </div>
+    </div>
+    <button class="btn-full" type="submit">Save</button>
+    <p class="msg" role="status"></p>
+  </form>
 </div>
 
 <div class="pane" id="pm">
@@ -138,8 +208,34 @@ form:has(#mqtt_enabled:checked) .mqtt-off{display:none}
         Anything that would draw more than this is dimmed to it: 300-2000 mA (1200 suits a 2.5 A supply).</p>
     </div>
     <div class="group">
+      <div class="sec">CPU Chart</div>
+      <div class="frow">
+        <div class="field"><label for="chart_topic">MQTT Topic</label>
+          <input type="text" name="chart.topic" id="chart_topic" maxlength="200" placeholder="none" spellcheck="false" autocapitalize="off" aria-describedby="chart_help">
+        </div>
+      </div>
+      <div class="frow">
+        <div class="field"><label for="chart_field">Field</label>
+          <input type="text" name="chart.field" id="chart_field" maxlength="40" spellcheck="false" autocapitalize="off">
+        </div>
+        <div class="field"><label for="chart_full">Full Column</label>
+          <input type="number" required name="chart.full_scale" id="chart_full" min="1">
+        </div>
+      </div>
+      <p class="note" id="chart_help">Each message on the topic adds a column: the field's value in its JSON (or the
+        message, if it's a number), where Full Column fills it (100 for a percentage). Saving a new topic restarts the app.</p>
+    </div>
+    <div class="group">
       <div class="sec">At Start</div>
       <label class="check"><input type="checkbox" name="device.default_state"> On</label>
+      <div class="frow">
+        <div class="field"><label for="default_mode">Mode</label>
+          <select name="device.default_mode" id="default_mode">
+            <option>Colour</option><option>Rainbows</option><option>Pulse</option>
+            <option>F1 Start</option><option>Pirate Flag</option><option>CPU Chart</option>
+          </select>
+        </div>
+      </div>
       <div class="frow">
         <div class="field"><label for="default_brightness">Brightness (%)</label>
           <input type="number" required name="device.default_brightness" id="default_brightness" min="1" max="100">
@@ -227,9 +323,60 @@ function live(input, send, show) {
 }
 live(el('brightness'), function () { control('/api/brightness', { brightness: Number(el('brightness').value) }); },
   function () { el('brightness_value').textContent = el('brightness').value + '%'; });
-live(el('colour'), function () { control('/api/mode', { mode: 'Colour', parameters: { Colour: el('colour').value } }); });
+// The colour is Colour mode's, or Pulse's; the speed is the animations'
+var HELP = {
+  'Colour': '',
+  'Rainbows': 'Rainbow colours moving across the grid.',
+  'Pulse': 'A glow growing from the centre and shrinking back, in the colour below.',
+  'F1 Start': 'As a Formula 1 start: the panels flash blue for 5 s, the five red lights come on a second apart, ' +
+    'then after a moment they go out, and so does the light.',
+  'Pirate Flag': 'The skull and crossbones, filling with red, over and over.',
+  'CPU Chart': "Another device's CPU use, a column a reading, newest on the left: set its topic on the Device tab (needs MQTT)."
+};
+var SPEED = ['Rainbows', 'Pulse', 'Pirate Flag'], shownMode = null;
+function showModeControls(mode) {
+  if (mode === shownMode) return;
+  shownMode = mode;
+  el('mode_help').textContent = HELP[mode] || '';
+  el('mode_help').hidden = !HELP[mode];
+  el('speed_row').hidden = SPEED.indexOf(mode) < 0;
+  el('colour_row').hidden = mode !== 'Colour' && mode !== 'Pulse';
+  el('kelvin_row').hidden = mode !== 'Colour';
+  el('f1_go').hidden = mode !== 'F1 Start';
+}
+el('mode').addEventListener('change', function () {
+  showModeControls(el('mode').value);
+  control('/api/mode', { mode: el('mode').value });
+});
+// Choosing F1 Start again (once it's over) starts it again
+el('f1_go').onclick = function () {
+  control('/api/mode', { mode: 'F1 Start' }).then(function () { return control('/api/power/on', {}); });
+};
+live(el('speed'), function () { control('/api/mode', { mode: el('mode').value, parameters: { Speed: Number(el('speed').value) } }); },
+  function () { el('speed_value').textContent = el('speed').value; });
+live(el('colour'), function () {
+  var mode = el('mode').value === 'Pulse' ? 'Pulse' : 'Colour';
+  control('/api/mode', { mode: mode, parameters: { Colour: el('colour').value } });
+});
 live(el('kelvin'), function () { control('/api/mode', { mode: 'Colour', parameters: { Kelvin: Number(el('kelvin').value) } }); },
   function () { el('kelvin_value').textContent = el('kelvin').value + ' K'; });
+
+// Alerts: the switch saves at once; the test shows one even with alerts off
+el('alerts_on').addEventListener('change', function () {
+  Base.api('/api/config', { alert: { enabled: el('alerts_on').checked } }).then(function () {
+    Base.say('alert_msg', el('alerts_on').checked ? 'Alerts on' : 'Alerts off', true);
+    refresh();
+  }).catch(function (e) { Base.say('alert_msg', e.message); });
+});
+el('alert_test').onclick = function () {
+  Base.api('/api/alert', { test: true }).then(function () {
+    Base.say('alert_msg', 'Alerting', true);
+    quickUntil = Date.now() + 2000;
+  }).catch(function (e) { Base.say('alert_msg', e.message); });
+};
+el('alert_stop').onclick = function () {
+  Base.api('/api/alert/stop', {}).then(function () { Base.say('alert_msg', ''); quickUntil = Date.now() + 1000; });
+};
 
 function showLight(i) {
   var l = i.light;
@@ -244,7 +391,18 @@ function showLight(i) {
     el('brightness').value = l.brightness;
     el('brightness_value').textContent = l.brightness + '%';
   }
-  if (l.mode === 'Colour' && editing !== el('colour') && l.parameters.Colour) el('colour').value = l.parameters.Colour;
+  if (document.activeElement !== el('mode')) el('mode').value = l.mode;
+  showModeControls(l.mode);
+  if (editing !== el('speed')) {
+    el('speed').value = l.parameters.Speed || 5;
+    el('speed_value').textContent = el('speed').value;
+  }
+  if (editing !== el('colour')) {
+    if (l.mode === 'Colour' && l.parameters.Colour) el('colour').value = l.parameters.Colour;
+    if (l.mode === 'Pulse') el('colour').value = l.parameters.Colour || '#d633ff';
+  }
+  if (document.activeElement !== el('alerts_on')) el('alerts_on').checked = l.alert.enabled;
+  el('state').textContent = l.alert.active ? 'Alert' : l.state ? 'On' : 'Off';
   if (editing !== el('kelvin')) {
     var k = l.parameters.Kelvin;
     el('kelvin_value').textContent = k ? k + ' K' : '';
@@ -275,12 +433,19 @@ function preview() {
   return Base.api('/api/pixels').then(function (p) {
     var cells = el('grid').children;
     p.pixels.forEach(function (c, n) { cells[n].style.setProperty('--c', lifted(c)); });
+    // An alert starting or ending: the badge says so at once
+    if (p.moving !== moving && (p.moving === 'alert' || moving === 'alert')) refresh();
+    moving = p.moving;
   }).catch(function () {});
 }
 
-// Every second, or every 100 ms while a change fades
+// Every second; every 100 ms while a change fades or an alert flashes, and 200 ms while a mode moves
+var moving = 'none';
 (function previewLoop() {
-  preview().then(function () { setTimeout(previewLoop, Date.now() < quickUntil ? 100 : 1000); });
+  preview().then(function () {
+    var quick = Date.now() < quickUntil || moving === 'alert';
+    setTimeout(previewLoop, quick ? 100 : moving === 'mode' && !document.hidden ? 200 : 1000);
+  });
 })();
 
 function refresh() { Base.api('/api/info').then(showLight).catch(function () {}); }

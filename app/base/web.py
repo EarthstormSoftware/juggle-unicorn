@@ -4,7 +4,8 @@ The web page and JSON API, on port 80, with Microdot.
 Every product has: GET / (its page, www/index.html), the base's shared style and script (/base.css, /base.js),
 GET /api/info, GET and POST /api/config, POST /api/restart and POST /api/reset. A light also has POST
 /api/power/on, /api/power/off, /api/power/toggle, /api/mode ({"mode", "parameters"}) and /api/brightness
-({"brightness"}), as PlasmaStick's. The product can add its own (routes(app, device)).
+({"brightness"}), as PlasmaStick's, and POST /api/alert ({"colour", "seconds", "on_ms", "off_ms", "brightness"}, each
+optional, and "test": true to show one with alerts switched off) and /api/alert/stop. The product can add its own (routes(app, device)).
 
 Two guards before every request: a POST that a browser sends from another site's page is refused (so a malicious page
 can't use the device through the browser), and with a web password set, every request needs it (HTTP Basic auth,
@@ -145,6 +146,21 @@ def create(device):
             if error:
                 return {'success': False, 'error': error}, 400
             return {'success': True, 'brightness': light.brightness}
+
+        @app.post('/api/alert')
+        async def alert(request):
+            data = _json(request)
+            error = light.alert(colour=data.get('colour'), seconds=data.get('seconds'), on_ms=data.get('on_ms'),
+                                off_ms=data.get('off_ms'), brightness=data.get('brightness'),
+                                test=data.get('test') is True)
+            if error:
+                return {'success': False, 'error': error}, 400
+            return {'success': True}
+
+        @app.post('/api/alert/stop')
+        async def alert_stop(request):
+            light.stop_alert()
+            return {'success': True}
 
     if hasattr(device.product, 'routes'):
         device.product.routes(app, device)

@@ -6,8 +6,13 @@ class) and its LEDs (an output with count and show(frame)); the light draws fram
 A frame is a list of (r, g, b), 0-255, one per LED, already scaled for brightness and fades. The output does what's
 particular to its LEDs: gamma, the order of the pixels, a power limit.
 
-Effects are classes made with (count, parameters, product) that give frame(ms) -> the next frame at full brightness,
-and their Speed (1-10) in parameters if they take one. (Effects come in a later step.)
+Effects are classes made with (count, parameters, light) that give frame(now) -> the next frame at full brightness
+(now in ms), with their Speed (1-10) in parameters if they take one. Optionally they have check(parameters) -> why
+the parameters can't be used (or None), and `finished`, which turns the light off once it's true (a sequence that
+ends, such as a race start).
+
+An alert interrupts whatever the light is doing, on or off: it flashes a colour for a while, then the light carries
+on as it was. The alert settings say how, and whether alerts are switched on (a test alert works either way).
 """
 from base.compat import asyncio, ticks_ms, ticks_diff, sleep_ms
 from base.log import Log
@@ -69,6 +74,16 @@ LIGHT_SETTINGS = {
         # Turning on and off, and changing the brightness or colour, fade over this long (0: at once)
         'transition_ms': Setting(500, is_int(0, 10000)),
     },
+    'alert': {
+        # Whether alerts interrupt the light (the switch); a test alert works either way
+        'enabled': Setting(False, is_bool),
+        'colour': Setting('#ff0000', _is_colour),
+        'seconds': Setting(10, is_int(1, 3600)),
+        # Each flash: this long on, then this long off (0: steady)
+        'on_ms': Setting(500, is_int(50, 10000)),
+        'off_ms': Setting(500, is_int(0, 10000)),
+        'brightness': Setting(100, is_int(1, 100)),
+    },
 }
 
 
@@ -95,6 +110,7 @@ class Light:
         self._colour = rgb(self.parameters['Colour'])
         self._colour_fade = None  # (from rgb, to rgb, start, ms)
         self._wake = asyncio.Event()
+        self._alert = None  # (rgb, start, ms, on_ms, off_ms, level) while one shows
         default_mode = settings.get('device', 'default_mode')
         error = self.set(on=settings.get('device', 'default_state'),
                          mode=default_mode if default_mode in self.modes else 'Colour', transition_ms=0)
@@ -111,14 +127,17 @@ class Light:
             return None
         if not isinstance(parameters, dict):
             return 'Mode parameters must be an object'
+        if 'Colour' in parameters and not is_valid_colour(parameters['Colour']):
+            return 'Colour must be a #RRGGBB hex colour'
         if mode == 'Colour':
-            if 'Colour' in parameters and not is_valid_colour(parameters['Colour']):
-                return 'Colour must be a #RRGGBB hex colour'
             if 'Kelvin' in parameters and not is_valid_kelvin(parameters['Kelvin']):
                 return 'Kelvin must be a whole number, {}-{}'.format(MIN_KELVIN, MAX_KELVIN)
-        elif 'Speed' in parameters and (not isinstance(parameters['Speed'], int) or not 1 <= parameters['Speed'] <= 10):
+            return None
+        speed = parameters.get('Speed')
+        if speed is not None and (not isinstance(speed, int) or isinstance(speed, bool) or not 1 <= speed <= 10):
             return 'Speed must be a whole number, 1-10'
-        return None
+        check = getattr(self.effects[mode], 'check', None)
+        return check(parameters) if check else None
 
     def set(self, on=None, mode=None, parameters=None, brightness=None, transition_ms=None):
         """Changes what the light does; anything None stays as it is. Returns why it couldn't, or None."""
@@ -156,10 +175,48 @@ class Light:
 
         if self.state() != before:
             Log.info(TAG, 'Now {}'.format(self.state()))
-            for listener in self.listeners:
-                listener(self)
+            self._told()
         self._wake.set()
         return None
+
+    def alert(self, colour=None, seconds=None, on_ms=None, off_ms=None, brightness=None, test=False):
+        """Starts an alert (or starts it again), with the alert settings for anything not given. Returns why it
+        couldn't, or None. Unless it's a test, it needs alerts switched on."""
+        def setting(key, value):
+            return self.settings.get('alert', key) if value is None else value
+        if not test and not self.settings.get('alert', 'enabled'):
+            return 'Alerts are switched off'
+        colour, seconds, brightness = setting('colour', colour), setting('seconds', seconds), setting('brightness', brightness)
+        on_ms, off_ms = setting('on_ms', on_ms), setting('off_ms', off_ms)
+        if not is_valid_colour(colour):
+            return 'Colour must be a #RRGGBB hex colour'
+        for name, value, low, high in (('Seconds', seconds, 1, 3600), ('OnMs', on_ms, 50, 10000),
+                                       ('OffMs', off_ms, 0, 10000), ('Brightness', brightness, 1, 100)):
+            if not isinstance(value, int) or isinstance(value, bool) or not low <= value <= high:
+                return '{} must be a whole number, {}-{}'.format(name, low, high)
+        started = self._alert is None
+        level = self.min_level + (1 - self.min_level) * (brightness - 1) / 99
+        self._alert = (rgb(colour), ticks_ms(), seconds * 1000, on_ms, off_ms, level)
+        Log.info(TAG, 'Alert: {} for {} s'.format(colour, seconds))
+        if started:
+            self._told()
+        self._wake.set()
+        return None
+
+    def stop_alert(self):
+        if self._alert is not None:
+            self._alert = None
+            Log.info(TAG, 'Alert over')
+            self._told()
+            self._wake.set()
+
+    @property
+    def alerting(self):
+        return self._alert is not None
+
+    def _told(self):
+        for listener in self.listeners:
+            listener(self)
 
     def toggle(self):
         self.set(on=not self.on)
@@ -209,15 +266,32 @@ class Light:
     def frame(self, now):
         """The frame to show now, and whether the light is moving (another frame is due soon)."""
         moving = self._step(now)
+        if self._alert is not None:
+            colour, start, ms, on_ms, off_ms, level = self._alert
+            elapsed = ticks_diff(now, start)
+            if elapsed < ms:
+                lit = elapsed % (on_ms + off_ms) < on_ms
+                return [tuple(c * level for c in colour) if lit else (0, 0, 0)] * self.output.count, True
+            self.stop_alert()
         level = self._level
         if level <= 0:
             return [(0, 0, 0)] * self.output.count, moving
         if self.mode == 'Colour':
             pixel = tuple(c * level for c in self._colour)
             return [pixel] * self.output.count, moving
-        if self._effect is None:
-            self._effect = self.effects[self.mode](self.output.count, self.parameters, self.product)
-        return [tuple(c * level for c in p) for p in self._effect.frame(now)], True
+        effect = self.effect()
+        pixels = effect.frame(now)
+        if getattr(effect, 'finished', False):
+            self._effect = None
+            self.set(on=False, transition_ms=0)
+            return [(0, 0, 0)] * self.output.count, True
+        return [tuple(c * level for c in p) for p in pixels], True
+
+    def effect(self):
+        """The current mode's effect (made when first needed), or None in Colour mode."""
+        if self._effect is None and self.mode != 'Colour':
+            self._effect = self.effects[self.mode](self.output.count, self.parameters, self)
+        return self._effect
 
     async def run(self):
         """Draws while anything moves, and waits for a change otherwise."""
