@@ -36,14 +36,22 @@ On Windows, with the Pi set up by `applpi flash` (so SSH works with your key):
 It copies the app to the Pi, which replaces the app it had, starts this one and says whether it's running. Then it's
 at `http://<name>.local`. Its settings are kept through deploys and OS updates.
 
+Once it's running, a new version can also go over Wi-Fi, to the app itself, with no SSH key:
+
+```powershell
+.\deploy.ps1 <name> -WiFi [-Password <the web password>]
+```
+
+The Pi tries the new version and goes back to the old one if it doesn't keep running.
+
 ## The page
 
 | Tab | Has |
 |---|---|
 | Control | The preview, power, brightness, the modes, speed, colour and white |
-| Device | The HAT's rotation and power limit, what it does at power-up, CPU Chart's topic, the web password, the log level, restart and reset |
+| Device | The HAT's rotation and power limit, what it does at power-up, CPU Chart's topic, the web password, the log level, restart, restarting the Pi and reset |
 | MQTT | The broker, the topic base, the group, and Home Assistant discovery |
-| Schedule | The location (for sunrise and sunset) and the events. The clock is the Pi's, in the time zone set at flashing |
+| Schedule | The location (for sunrise and sunset), the events, and the Pi's clock: its time zone and time server |
 | Alert | The Alerts switch, Test and Stop, the alert's colour, timing and brightness, and the topic to watch |
 
 ## The API
@@ -61,6 +69,9 @@ As PlasmaStick's, from App Base:
 | `GET /api/pixels` | What the HAT shows: 64 `#rrggbb` in reading order |
 | `GET`, `POST /api/config` | The settings |
 | `POST /api/restart`, `/api/reset` | Restarts the app; resets the settings (`{"confirm": true}`) |
+| `GET`, `POST /api/clock` | The Pi's time zone and time server |
+| `GET`, `POST /api/update` | How the last update went; a new version of the app, as a tar (what `deploy.ps1 -WiFi` sends) |
+| `POST /api/reboot` | Restarts the Pi |
 
 POSTs from other sites' pages are refused, and with a web password set every request needs it.
 

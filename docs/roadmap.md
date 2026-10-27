@@ -77,14 +77,15 @@ Rainbows, Pulse, F1 Start, Pirate Flag and CPU Chart, and alerts. Checked on the
 
 A Schedule tab, and the group setting on the MQTT tab, from App Base. Checked with a PlasmaStick in the same group.
 The page matches PlasmaStick's (its tabs, power switch, mode buttons and colour row, from App Base), with the
-preview above the controls and an Alert tab. The schedule uses the Pi's clock and time zone (set at flashing), so
-it has no clock settings of its own.
+preview above the controls and an Alert tab. The schedule uses the Pi's clock, whose time zone and time server
+are set on the Schedule tab (ApplPi OS v0.4's app requests).
 
 ### 5. Finish
 
 README, tests, the first release, and a Pi running it.
-v0.1.0 (2026-10-27), on App Base v0.1.0. It needs ApplPi OS v0.4 (`rpi_ws281x` and `"pwm"`), so it's
-published when that is.
+v0.1.0 (2026-10-27), on App Base v0.1.0. v0.2.0 (2026-10-27), on App Base v0.2.0: deploys over Wi-Fi, the
+Pi's clock and restarting the Pi from the page, and systemd's watchdog. It needs ApplPi OS v0.4 (`rpi_ws281x`,
+`"pwm"` and the app requests). The repos stay private until the app contract is settled, near ApplPi OS v1.
 
 ### 6. Status and alerts
 
