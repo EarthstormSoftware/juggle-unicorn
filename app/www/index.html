@@ -193,13 +193,35 @@ form:has(#mqtt_enabled:checked) .mqtt-off{display:none}
     goes back to this one if it doesn't keep running.</p>
   <p class="note" id="update_note"></p>
 
+  <div data-os-setup hidden>
+    <div class="sec">Name and Wi-Fi</div>
+    <p class="note">The Pi's name and Wi-Fi network are changed in its setup mode: it restarts with the ApplPi-SETUP
+      Wi-Fi network and a setup page, for as long as set below, then carries on with its settings unless new ones are
+      saved there.</p>
+    <div class="buttons">
+      <button type="button" class="btn-full quiet" data-setup-mode data-msg="wifi_msg" data-confirm="Restart the Pi into setup mode? This page goes away until it's back.">Rename or change Wi-Fi…</button>
+    </div>
+    <label class="check"><input type="checkbox" id="wifi_fallback_enabled"> If Wi-Fi doesn't connect, go into setup mode by itself</label>
+    <div class="frow">
+      <div class="field"><label for="wifi_fallback_after">After (minutes without a network)</label>
+        <input type="number" id="wifi_fallback_after" min="1" max="60" step="1">
+      </div>
+      <div class="field"><label for="wifi_fallback_for">For (minutes, then try Wi-Fi again)</label>
+        <input type="number" id="wifi_fallback_for" min="5" max="120" step="1">
+      </div>
+    </div>
+    <button type="button" class="reset" id="wifi_save">Save</button>
+    <p class="msg" id="wifi_msg" role="status" aria-live="polite"></p>
+  </div>
+
   <div class="sec">Restart and Reset</div>
-  <p class="note">Reset puts every setting on these pages back to its default (the web password too). The Pi's name and
-    Wi-Fi network stay: they're set when the card is flashed.</p>
+  <p class="note">Reset puts every setting on these pages back to its default (the web password too). A factory reset
+    also makes the Pi forget its name, Wi-Fi and SSH keys, and start in setup mode as a new Pi.</p>
   <div class="buttons">
     <button type="button" class="btn-full quiet" data-restart data-msg="reset_msg">Restart</button>
     <button type="button" class="btn-full quiet" data-reboot data-os-requests hidden data-msg="reset_msg" data-confirm="Restart the Pi? It's back in about a minute.">Restart the Pi</button>
     <button type="button" class="btn-full danger" data-reset data-msg="reset_msg" data-confirm="Reset all settings to their defaults? The app restarts.">Reset settings</button>
+    <button type="button" class="btn-full danger" data-factory-reset data-os-setup hidden data-msg="reset_msg" data-confirm="Factory reset? The Pi forgets its name, Wi-Fi and SSH keys and starts in setup mode, as a new Pi. Use Reset settings as well to reset this app.">Factory reset</button>
   </div>
   <p class="msg" id="reset_msg" role="status" aria-live="polite"></p>
 </div>

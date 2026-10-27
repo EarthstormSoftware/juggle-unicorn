@@ -226,6 +226,20 @@ var Base = (function () {
         }).catch(function (e) { say(b.dataset.msg, 'Not restarted: ' + e.message); });
       });
     });
+    // The OS's setup mode (renaming the Pi, its Wi-Fi) and factory reset: the Pi restarts into setup mode, so the page
+    // doesn't wait for it to come back, but says where to go
+    [['data-setup-mode', '/api/setup-mode'], ['data-factory-reset', '/api/factory-reset']].forEach(function (a) {
+      document.querySelectorAll('[' + a[0] + ']').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!confirm(b.dataset.confirm)) return;
+          api(a[1], { confirm: true }).then(function () {
+            restarting = true;
+            say(b.dataset.msg, 'Restarting into setup mode. Join the ApplPi-SETUP Wi-Fi and open http://192.168.4.1 ' +
+              '(on Ethernet: https://' + (info ? info.name : '<name>') + '.local/), in about a minute.', true);
+          }).catch(function (e) { say(b.dataset.msg, 'Not done: ' + e.message); });
+        });
+      });
+    });
     document.querySelectorAll('[data-reset]').forEach(function (b) {
       b.addEventListener('click', function () {
         if (!confirm(b.dataset.confirm)) return;
@@ -266,6 +280,8 @@ var Base = (function () {
     // What the OS does for an ApplPi app: shown where it takes the app's requests
     var requests = !!(i.os && i.os.requests);
     document.querySelectorAll('[data-os-requests]').forEach(function (n) { n.hidden = !requests; });
+    var setup = !!(i.os && i.os.setup);
+    document.querySelectorAll('[data-os-setup]').forEach(function (n) { n.hidden = !setup; });
     if (el('update_note')) {
       var u = i.update;
       el('update_note').textContent = !u ? '' : (u.success ? '' : 'The last update failed: ') + u.message +
@@ -587,10 +603,36 @@ var Base = (function () {
     });
   }
 
+  // The Wi-Fi fallback (the OS's): setup mode by itself when Wi-Fi doesn't connect, after and for so many minutes.
+  // Its fields are wifi_fallback_enabled, wifi_fallback_after and wifi_fallback_for, saved by wifi_save.
+  function wifi() {
+    if (!el('wifi_save')) return;
+    var loaded = false;
+    infoListeners.push(function (i) {
+      if (loaded || !(i.os && i.os.setup)) return;
+      loaded = true;
+      api('/api/wifi').then(function (w) {
+        el('wifi_fallback_enabled').checked = w.fallback.enabled;
+        el('wifi_fallback_after').value = w.fallback.after_minutes;
+        el('wifi_fallback_for').value = w.fallback.for_minutes;
+      }).catch(function (e) { say('wifi_msg', 'Could not load the Wi-Fi settings: ' + e.message); });
+    });
+    el('wifi_save').addEventListener('click', function () {
+      say('wifi_msg', 'Saving…', true);
+      api('/api/wifi', { fallback: {
+        enabled: el('wifi_fallback_enabled').checked,
+        after_minutes: parseInt(el('wifi_fallback_after').value, 10),
+        for_minutes: parseInt(el('wifi_fallback_for').value, 10)
+      } }).then(function () { say('wifi_msg', 'Saved: from the Pi’s next start.', true); })
+        .catch(function (e) { say('wifi_msg', 'Not saved: ' + e.message); });
+    });
+  }
+
   function start() {
     tabs();
     settingsForms();
     actions();
+    wifi();
     setInterval(function () { if (!document.hidden) refresh(); }, 3000);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) refresh(); });
     // The settings load after the first /api/info, which brings the modes the Default Mode list needs

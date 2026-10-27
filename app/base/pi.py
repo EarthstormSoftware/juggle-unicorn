@@ -2,13 +2,15 @@
 The platform for an ApplPi OS app: what the OS does that a Pico does itself.
 
 The app's state (config.json and anything else it writes) is in APPLPI_STATE (/data/app-state), as the rest of the Pi
-is read-only. The device name is the Pi's: it's shown, not changed (SSH and applpi know the Pi by it). A restart ends
-the app, which systemd starts again.
+is read-only. The device name is the Pi's: it's shown, and changed in the OS's setup mode (SSH and applpi know the Pi
+by it). A restart ends the app, which systemd starts again.
 
 What the OS does for the app, it asks for through app-request (ApplPi OS v0.4; the app user may run it as root by
-sudo): a new version of itself, on trial; the time zone and time server; restarting the Pi. On a PC there's no
-app-request, so those aren't offered (os_requests() is False). systemd's watchdog restarts the app if its event loop
-stops (watchdog()).
+sudo): a new version of itself, on trial; the time zone and time server; restarting the Pi. From the release after
+v0.4 (os_setup()), also setup mode: restarting into it (to rename the Pi, or change its Wi-Fi), a factory reset, and
+the Wi-Fi fallback (setup mode by itself when Wi-Fi doesn't connect: on or off, after how long, for how long). On a PC
+there's no app-request, so none of this is offered (os_requests() is False). systemd's watchdog restarts the app if
+its event loop stops (watchdog()).
 """
 import asyncio
 import json
@@ -60,7 +62,7 @@ def health():
         'temperature_c': round(int(temperature) / 1000, 1) if temperature else None,
         'load': round(os.getloadavg()[0], 2) if hasattr(os, 'getloadavg') else None,
         'os': {'version': release.get('VERSION'), 'build': release.get('BUILD_STAMP'), 'slot': slot or None,
-               'requests': os_requests()},
+               'requests': os_requests(), 'setup': os_setup()},
         'update': update_result(),
     }
 
@@ -160,6 +162,53 @@ def update_result():
 def restart_device():
     """Restarts the Pi."""
     _request('restart')
+
+
+_setup = None
+
+
+def os_setup():
+    """Whether the OS has setup mode for the app (the release after ApplPi OS v0.4): app-request knows factory-reset.
+    Found once, from app-request itself, as /api/info asks every few seconds."""
+    global _setup
+    if _setup is None:
+        try:
+            with open(APP_REQUEST, encoding='utf-8') as f:
+                _setup = 'factory-reset' in f.read()
+        except OSError:
+            _setup = False
+    return _setup
+
+
+def _need_setup():
+    if not os_setup():
+        raise RequestError('Only on ApplPi OS with setup mode (the release after v0.4).')
+
+
+def wifi_fallback():
+    """{"enabled", "after_minutes", "for_minutes"}: whether the Pi goes into setup mode by itself when Wi-Fi doesn't
+    connect, after how long, and for how long."""
+    _need_setup()
+    return clock_settings()['wifi_fallback']
+
+
+def set_wifi_fallback(enabled, after_minutes, for_minutes):
+    """Used from the Pi's next start. The OS checks the limits (1-60 and 5-120 minutes)."""
+    _need_setup()
+    _request('wifi-fallback', 'on' if enabled else 'off', str(int(after_minutes)), str(int(for_minutes)))
+
+
+def setup_mode():
+    """Restarts the Pi into setup mode, keeping its settings until new ones are saved there."""
+    _need_setup()
+    _request('setup')
+
+
+def factory_reset():
+    """Forgets the Pi's settings (name, Wi-Fi, SSH keys, time zone) and restarts it into setup mode, as a new Pi. The
+    app and its state stay (the app's own reset is separate)."""
+    _need_setup()
+    _request('factory-reset')
 
 
 async def watchdog():

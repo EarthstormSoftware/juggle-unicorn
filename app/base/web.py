@@ -9,7 +9,10 @@ optional, and "test": true to show one with alerts switched off) and /api/alert/
 
 An ApplPi app also has what it asks of the OS: GET /api/update (the last update's result), POST /api/update (a .tar
 of the app's folder: the OS installs it on trial and restarts the app with it), GET and POST /api/clock
-({"time_zone", "ntp"}, and the zones to choose from) and POST /api/reboot ({"confirm": true}: restarts the Pi). The product can add its own (routes(app, device)).
+({"time_zone", "ntp"}, and the zones to choose from) and POST /api/reboot ({"confirm": true}: restarts the Pi). With
+setup mode in the OS: GET and POST /api/wifi ({"fallback": {"enabled", "after_minutes", "for_minutes"}}: setup mode
+when Wi-Fi doesn't connect), POST /api/setup-mode and /api/factory-reset (each {"confirm": true}). The product can
+add its own (routes(app, device)).
 
 Two guards before every request: a POST that a browser sends from another site's page is refused (so a malicious page
 can't use the device through the browser), and with a web password set, every request needs it (HTTP Basic auth,
@@ -168,22 +171,54 @@ def create(device):
                     platform.set_ntp(str(data['ntp']).strip())
             return asked(do)
 
-        @app.post('/api/reboot')
-        async def reboot(request):
+        def restarting(request, available, what, do):
+            """For the requests that restart the Pi: {"confirm": true} needed, the answer sent, then done."""
             if _json(request).get('confirm') is not True:
                 return {'success': False, 'error': 'confirm must be true'}, 400
-            if not platform.os_requests():
-                return {'success': False, 'error': 'Only on ApplPi OS v0.4 or later.'}, 400
+            if not available:
+                return {'success': False, 'error': 'Only on ApplPi OS v0.4 or later.' if do == platform.restart_device
+                        else 'Only on ApplPi OS with setup mode (the release after v0.4).'}, 400
 
             async def later():
                 await asyncio.sleep(0.5)  # the answer goes first
-                Log.warn(TAG, 'Restarting the Pi')
+                Log.warn(TAG, what)
                 try:
-                    platform.restart_device()
+                    do()
                 except platform.RequestError as e:
-                    Log.error(TAG, "Couldn't restart the Pi: {}".format(e))
+                    Log.error(TAG, "Couldn't: {}".format(e))
             asyncio.create_task(later())
             return {'success': True}
+
+        @app.post('/api/reboot')
+        async def reboot(request):
+            return restarting(request, platform.os_requests(), 'Restarting the Pi', platform.restart_device)
+
+        @app.get('/api/wifi')
+        async def wifi(request):
+            if not platform.os_setup():
+                return {'available': False}
+            try:
+                return {'available': True, 'fallback': platform.wifi_fallback()}
+            except platform.RequestError as e:
+                return {'success': False, 'error': str(e)}, 400
+
+        @app.post('/api/wifi')
+        async def set_wifi(request):
+            data = _json(request).get('fallback') or {}
+            try:
+                enabled, after, for_ = data['enabled'], int(data['after_minutes']), int(data['for_minutes'])
+            except (KeyError, TypeError, ValueError):
+                return {'success': False, 'error': 'fallback needs enabled, after_minutes and for_minutes'}, 400
+            return asked(lambda: platform.set_wifi_fallback(enabled is True, after, for_))
+
+        @app.post('/api/setup-mode')
+        async def setup_mode(request):
+            return restarting(request, platform.os_setup(), 'Restarting the Pi into setup mode', platform.setup_mode)
+
+        @app.post('/api/factory-reset')
+        async def factory_reset(request):
+            return restarting(request, platform.os_setup(), 'Factory reset: the Pi forgets its settings',
+                              platform.factory_reset)
 
     if device.light is not None:
         light = device.light
