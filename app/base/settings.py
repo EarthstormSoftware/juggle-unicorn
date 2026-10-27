@@ -141,10 +141,13 @@ class Settings:
                     return '{}.{} {}'.format(section, key, error), set()
                 new[(section, key)] = setting.store(value) if setting.store else value
         changed = set(name for name, value in new.items() if self.values[name[0]][name[1]] != value)
-        for (section, key), value in new.items():
-            self.values[section][key] = value
         if changed:
-            self.save()
+            # Saved before they're used, so a failed save changes nothing
+            values = {section: dict(settings) for section, settings in self.values.items()}
+            for section, key in changed:
+                values[section][key] = new[(section, key)]
+            write_atomically(self.path, json.dumps(values))
+            self.values = values
         return None, changed
 
     def restart_needed(self, changed):

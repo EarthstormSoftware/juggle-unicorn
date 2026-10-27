@@ -74,4 +74,5 @@ def write_atomically(path, text):
         if not MICROPYTHON:
             f.flush()
             os.fsync(f.fileno())
-    os.rename(temporary, path)
+    # replace overwrites on Windows too (for trying an app on a PC); MicroPython's rename overwrites
+    getattr(os, 'replace', os.rename)(temporary, path)

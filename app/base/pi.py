@@ -52,6 +52,11 @@ def health():
     }
 
 
+def mqtt_client(**options):
+    from base.mqttclient import Client
+    return Client(**options)
+
+
 def restart():
     """Ends the app; systemd starts it again (Restart=always)."""
     os._exit(0)

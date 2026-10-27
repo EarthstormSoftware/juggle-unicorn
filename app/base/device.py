@@ -3,6 +3,7 @@ The device: a product, the platform it runs on, its settings, its light (if it's
 
 A product is a module (product.py) with:
   NAME, VERSION                 what the page and /api/info show
+  MANUFACTURER, MODEL           optional: the hardware, for Home Assistant (default: Earthstorm Software, NAME)
   SETTINGS                      its own settings ({section: {key: Setting}}), next to the base's
   LIGHT_MODES (lights only)     its effects by name ({} for Colour only); with it, the product is a light
   output(device) (lights only)  its LEDs: an object with count and show(frame)
@@ -27,7 +28,8 @@ class Device:
         self.product = product
         self.platform = platform
         is_light = hasattr(product, 'LIGHT_MODES')
-        schemas = [BASE_SETTINGS, product.SETTINGS]
+        from base.mqtt import MQTT_SETTINGS
+        schemas = [BASE_SETTINGS, MQTT_SETTINGS, product.SETTINGS]
         if is_light:
             from base.light import LIGHT_SETTINGS
             schemas.insert(1, LIGHT_SETTINGS)
@@ -38,6 +40,9 @@ class Device:
         if is_light:
             from base.light import Light
             self.light = Light(product.output(self), self.settings, product.LIGHT_MODES, product)
+        self.mqtt = None  # until it's made, as making it asks info() which figures there are
+        from base.mqtt import Mqtt
+        self.mqtt = Mqtt(self)
 
     def info(self):
         collect()
@@ -58,6 +63,8 @@ class Device:
                 'brightness': light.brightness,
                 'modes': light.modes,
             }
+        if self.mqtt is not None:
+            info['mqtt'] = self.mqtt.status()
         if hasattr(self.product, 'info'):
             info.update(self.product.info(self))
         return info
@@ -86,6 +93,8 @@ class Device:
         tasks = [asyncio.create_task(app.start_server(host=None if not MICROPYTHON else '0.0.0.0', port=port))]
         if self.light is not None:
             tasks.append(asyncio.create_task(self.light.run()))
+        if self.mqtt.enabled:
+            tasks.append(asyncio.create_task(self.mqtt.run()))
         if hasattr(self.product, 'tasks'):
             tasks += [asyncio.create_task(task) for task in self.product.tasks(self)]
         Log.info(TAG, '{} {} on port {}'.format(self.product.NAME, self.product.VERSION, port))

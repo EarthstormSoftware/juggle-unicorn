@@ -160,11 +160,18 @@ var Base = (function () {
         var chips = [i.product + ' ' + i.version, 'up ' + duration(i.app_uptime_s != null ? i.app_uptime_s : i.uptime_s)];
         if (i.temperature_c != null) chips.push(i.temperature_c + ' °C');
         if (i.os && i.os.version) chips.push('ApplPi OS ' + i.os.version + (i.os.slot ? ', slot ' + i.os.slot : ''));
+        if (i.mqtt && i.mqtt.enabled) {
+          chips.push(i.mqtt.connected ? ['MQTT connected', 'ok'] : ['MQTT not connected', 'bad']);
+          if (!i.mqtt.connected && i.mqtt.error) {
+            el('alert').textContent = 'MQTT: ' + i.mqtt.error;
+            el('alert').hidden = false;
+          }
+        }
         el('health').innerHTML = '';
         chips.forEach(function (c) {
           var s = document.createElement('span');
-          s.className = 'chip';
-          s.textContent = c;
+          s.className = typeof c === 'string' ? 'chip' : 'chip ' + c[1];
+          s.textContent = typeof c === 'string' ? c : c[0];
           el('health').appendChild(s);
         });
         if (onInfo) onInfo(i);

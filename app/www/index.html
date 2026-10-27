@@ -15,6 +15,9 @@
 .power .btn-full{margin-top:0}
 .slider{display:flex;align-items:center;gap:10px}
 .slider output{font-size:12px;color:var(--text2);min-width:56px;text-align:right}
+/* The broker's details only while MQTT is on */
+form:has(#mqtt_enabled:not(:checked)) .mqtt-more{display:none}
+form:has(#mqtt_enabled:checked) .mqtt-off{display:none}
 </style>
 </head>
 <body>
@@ -28,9 +31,11 @@
 <noscript><p class="noscript">This page needs JavaScript. Turn it on for this site, then reload.</p></noscript>
 
 <input type="radio" name="t" id="tc" data-pane="pc" aria-label="Control tab" checked>
+<input type="radio" name="t" id="tm" data-pane="pm" aria-label="MQTT tab">
 <input type="radio" name="t" id="td" data-pane="pd" aria-label="Device tab">
 <nav>
   <label for="tc">Control</label>
+  <label for="tm">MQTT</label>
   <label for="td">Device</label>
 </nav>
 
@@ -60,6 +65,56 @@
     <output for="kelvin" id="kelvin_value"></output>
   </div>
   <p class="msg" id="control_msg" role="status"></p>
+</div>
+
+<div class="pane" id="pm">
+  <form class="settings">
+    <label class="check"><input type="checkbox" name="mqtt.enabled" id="mqtt_enabled"> Connect to an MQTT broker</label>
+    <p class="note mqtt-off">MQTT lets home automation software such as Home Assistant or Node-RED control the light.</p>
+    <div class="cols mqtt-more">
+    <div class="group">
+      <div class="sec">Broker</div>
+      <div class="frow">
+        <div class="field"><label for="broker_address">Address</label>
+          <input type="text" name="mqtt.broker_address" id="broker_address" maxlength="100" placeholder="host or host:port" spellcheck="false" autocapitalize="off">
+        </div>
+      </div>
+      <div class="frow">
+        <div class="field"><label for="mqtt_user">Username</label>
+          <input type="text" name="mqtt.user" id="mqtt_user" maxlength="64" autocomplete="off" spellcheck="false" autocapitalize="off">
+        </div>
+        <div class="field"><label for="mqtt_password">Password</label>
+          <input type="password" name="mqtt.password" id="mqtt_password" maxlength="64" placeholder="leave blank to keep" autocomplete="new-password">
+        </div>
+      </div>
+      <p class="note" data-password-set="mqtt.password" hidden>A password is set.
+        <button type="button" class="btn-full quiet" data-clear-password="mqtt.password">Remove the password</button></p>
+    </div>
+    <div class="group">
+      <div class="sec">Topics</div>
+      <div class="frow">
+        <div class="field"><label for="topic_base">Topic Base</label>
+          <input type="text" required name="mqtt.topic_base" id="topic_base" maxlength="100" placeholder="/home/device/{name}" aria-describedby="topic_help" spellcheck="false" autocapitalize="off">
+        </div>
+      </div>
+      <p class="note" id="topic_help">{name} becomes the device name. The light listens on &lt;base&gt;/control and
+        reports on &lt;base&gt;/state, as PlasmaStick does. Topics no longer used are cleared from the broker.</p>
+    </div>
+    <div class="group">
+      <div class="sec">Home Assistant</div>
+      <label class="check"><input type="checkbox" name="mqtt.ha_discovery" id="ha_discovery"> Announce the light to Home Assistant</label>
+      <div class="frow">
+        <div class="field"><label for="ha_prefix">Discovery Prefix</label>
+          <input type="text" required name="mqtt.ha_prefix" id="ha_prefix" maxlength="100" placeholder="homeassistant" aria-describedby="ha_help" spellcheck="false" autocapitalize="off">
+        </div>
+      </div>
+      <p class="note" id="ha_help">Home Assistant adds the light automatically (MQTT discovery). Turning this off removes
+        it again. Only change the prefix if Home Assistant's has been changed.</p>
+    </div>
+    </div>
+    <button class="btn-full" type="submit">Save</button>
+    <p class="msg" role="status"></p>
+  </form>
 </div>
 
 <div class="pane" id="pd">

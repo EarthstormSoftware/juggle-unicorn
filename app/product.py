@@ -6,6 +6,9 @@ from base.settings import Setting, is_int, is_one_of
 from hat import UnicornHat
 
 NAME = 'Unicorn'
+# For Home Assistant
+MANUFACTURER = 'Pimoroni'
+MODEL = 'Unicorn HAT'
 VERSION = json.loads((Path(__file__).parent / 'app.json').read_text(encoding='utf-8'))['version']
 
 # The modes beyond Colour (step 3)
