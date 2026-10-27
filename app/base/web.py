@@ -5,7 +5,11 @@ Every product has: GET / (its page, www/index.html), the base's shared style and
 GET /api/info, GET and POST /api/config, POST /api/restart and POST /api/reset. A light also has POST
 /api/power/on, /api/power/off, /api/power/toggle, /api/mode ({"mode", "parameters"}) and /api/brightness
 ({"brightness"}), as PlasmaStick's, and POST /api/alert ({"colour", "seconds", "on_ms", "off_ms", "brightness"}, each
-optional, and "test": true to show one with alerts switched off) and /api/alert/stop. The product can add its own (routes(app, device)).
+optional, and "test": true to show one with alerts switched off) and /api/alert/stop.
+
+An ApplPi app also has what it asks of the OS: GET /api/update (the last update's result), POST /api/update (a .tar
+of the app's folder: the OS installs it on trial and restarts the app with it), GET and POST /api/clock
+({"time_zone", "ntp"}, and the zones to choose from) and POST /api/reboot ({"confirm": true}: restarts the Pi). The product can add its own (routes(app, device)).
 
 Two guards before every request: a POST that a browser sends from another site's page is refused (so a malicious page
 can't use the device through the browser), and with a web password set, every request needs it (HTTP Basic auth,
@@ -19,6 +23,8 @@ from base.passwords import check_password
 TAG = 'HTTP'
 BASE_WWW = beside(__file__, 'www')
 TEXT = {'Content-Type': 'text/plain; charset=utf-8'}
+# The largest app a Pi takes over the network (ApplPi OS takes up to 64 MiB)
+UPDATE_MAX = 16 * 1024 * 1024
 
 
 def origin_allowed(headers):
@@ -118,6 +124,66 @@ def create(device):
         device.reset()
         asyncio.create_task(device.restart_soon())
         return {'success': True}
+
+    platform = device.platform
+    if hasattr(platform, 'os_requests'):
+        # What an ApplPi app asks of the OS. A new version comes whole, as a .tar of the app's folder
+        from base.microdot import Request
+        Request.max_content_length = Request.max_body_length = UPDATE_MAX
+
+        def asked(do):
+            try:
+                do()
+            except platform.RequestError as e:
+                return {'success': False, 'error': str(e)}, 400
+            return {'success': True}
+
+        @app.get('/api/update')
+        async def update_result(request):
+            return {'available': platform.os_requests(), 'result': platform.update_result()}
+
+        @app.post('/api/update')
+        async def update(request):
+            body = request.body or b''
+            if len(body) < 512 or body[257:262] != b'ustar':
+                return {'success': False, 'error': "Send a .tar of the app's folder"}, 400
+            Log.info(TAG, 'An update ({} bytes): handing it to the OS'.format(len(body)))
+            return asked(lambda: platform.update(body))
+
+        @app.get('/api/clock')
+        async def clock(request):
+            try:
+                settings = platform.clock_settings()
+            except platform.RequestError as e:
+                return {'success': False, 'error': str(e)}, 400
+            return dict(settings, zones=platform.time_zones())
+
+        @app.post('/api/clock')
+        async def set_clock(request):
+            data = _json(request)
+            def do():
+                if data.get('time_zone') is not None:
+                    platform.set_time_zone(str(data['time_zone']))
+                if data.get('ntp') is not None:
+                    platform.set_ntp(str(data['ntp']).strip())
+            return asked(do)
+
+        @app.post('/api/reboot')
+        async def reboot(request):
+            if _json(request).get('confirm') is not True:
+                return {'success': False, 'error': 'confirm must be true'}, 400
+            if not platform.os_requests():
+                return {'success': False, 'error': 'Only on ApplPi OS v0.4 or later.'}, 400
+
+            async def later():
+                await asyncio.sleep(0.5)  # the answer goes first
+                Log.warn(TAG, 'Restarting the Pi')
+                try:
+                    platform.restart_device()
+                except platform.RequestError as e:
+                    Log.error(TAG, "Couldn't restart the Pi: {}".format(e))
+            asyncio.create_task(later())
+            return {'success': True}
 
     if device.light is not None:
         light = device.light

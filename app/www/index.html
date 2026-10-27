@@ -188,11 +188,17 @@ form:has(#mqtt_enabled:checked) .mqtt-off{display:none}
     <p class="msg" role="status" aria-live="polite"></p>
   </form>
 
+  <div class="sec">Updates</div>
+  <p class="note"><code>deploy.ps1 &lt;name&gt; -WiFi</code> sends a new version over the network: the Pi tries it, and
+    goes back to this one if it doesn't keep running.</p>
+  <p class="note" id="update_note"></p>
+
   <div class="sec">Restart and Reset</div>
   <p class="note">Reset puts every setting on these pages back to its default (the web password too). The Pi's name and
     Wi-Fi network stay: they're set when the card is flashed.</p>
   <div class="buttons">
     <button type="button" class="btn-full quiet" data-restart data-msg="reset_msg">Restart</button>
+    <button type="button" class="btn-full quiet" data-reboot data-os-requests hidden data-msg="reset_msg" data-confirm="Restart the Pi? It's back in about a minute.">Restart the Pi</button>
     <button type="button" class="btn-full danger" data-reset data-msg="reset_msg" data-confirm="Reset all settings to their defaults? The app restarts.">Reset settings</button>
   </div>
   <p class="msg" id="reset_msg" role="status" aria-live="polite"></p>
@@ -267,8 +273,20 @@ form:has(#mqtt_enabled:checked) .mqtt-off{display:none}
     <div class="group">
       <div class="sec">Clock</div>
       <p class="note" id="clock_note"></p>
-      <p class="note">The Pi keeps its own clock, from the internet, in the time zone set when its card was flashed;
-        summer time follows that zone.</p>
+      <div data-os-requests hidden>
+        <div class="frow">
+          <div class="field"><label for="time_zone">Time Zone</label>
+            <select id="time_zone" aria-describedby="zone_help"></select>
+          </div>
+          <div class="field"><label for="ntp">Time Server (NTP)</label>
+            <input type="text" id="ntp" maxlength="253" placeholder="the default (Debian's)" spellcheck="false" autocapitalize="off">
+          </div>
+        </div>
+        <button type="button" class="reset" id="clock_save">Save the clock</button>
+        <p class="msg" id="clock_msg" role="status" aria-live="polite"></p>
+      </div>
+      <p class="note" id="zone_help">The clock is the Pi's, set from the internet; summer time follows the time zone.
+        The time zone was first set when the card was flashed.</p>
     </div>
     <div class="group">
       <div class="sec">Location</div>

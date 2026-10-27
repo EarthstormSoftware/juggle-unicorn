@@ -52,6 +52,7 @@ input[type=text]:focus,input[type=number]:focus,input[type=password]:focus,selec
 input[type=range]{width:100%;accent-color:var(--accent)}
 input[type=color]{width:100%;height:40px;border:1.5px solid var(--border);border-radius:6px;background:var(--field);padding:2px}
 .note{font-size:12px;color:var(--muted);margin-bottom:8px}
+.note.bad{color:var(--bad)}
 .msg{font-size:12px;color:var(--bad);min-height:16px;margin-top:4px}
 .msg.good{color:var(--ok)}
 .btn-full{display:block;width:100%;margin-top:10px;padding:11px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;background:var(--accent);color:var(--on-accent)}

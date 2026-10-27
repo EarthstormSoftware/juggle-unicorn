@@ -215,6 +215,17 @@ var Base = (function () {
         api('/api/restart', {}).then(function () { say(b.dataset.msg, 'Restarting…', true); waitForRestart(msg); });
       });
     });
+    // Restarting the Pi (an ApplPi app): shown only where the OS takes the app's requests
+    document.querySelectorAll('[data-reboot]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (!confirm(b.dataset.confirm)) return;
+        var msg = el(b.dataset.msg);
+        api('/api/reboot', { confirm: true }).then(function () {
+          say(b.dataset.msg, 'Restarting the Pi… (about a minute)', true);
+          waitForRestart(msg);
+        }).catch(function (e) { say(b.dataset.msg, 'Not restarted: ' + e.message); });
+      });
+    });
     document.querySelectorAll('[data-reset]').forEach(function (b) {
       b.addEventListener('click', function () {
         if (!confirm(b.dataset.confirm)) return;
@@ -251,6 +262,15 @@ var Base = (function () {
         health.appendChild(chip('MQTT not connected', 'bad'));
         problems.push('MQTT is not connected' + (i.mqtt.error ? ': ' + i.mqtt.error : '.'));
       }
+    }
+    // What the OS does for an ApplPi app: shown where it takes the app's requests
+    var requests = !!(i.os && i.os.requests);
+    document.querySelectorAll('[data-os-requests]').forEach(function (n) { n.hidden = !requests; });
+    if (el('update_note')) {
+      var u = i.update;
+      el('update_note').textContent = !u ? '' : (u.success ? '' : 'The last update failed: ') + u.message +
+        (u.time ? ' (' + new Date(u.time * 1000).toLocaleString() + ')' : '');
+      el('update_note').className = 'note' + (u && !u.success ? ' bad' : '');
     }
     showAlert(problems.join(' '));
     infoListeners.forEach(function (f) { f(i); });
@@ -528,8 +548,31 @@ var Base = (function () {
     el('latitude').addEventListener('input', showSun);
     el('longitude').addEventListener('input', showSun);
 
+    // The time zone and time server, which are the OS's (an ApplPi app asks it to change them)
+    var clockLoaded = false;
+    function loadClock() {
+      clockLoaded = true;
+      api('/api/clock').then(function (c) {
+        var select = el('time_zone');
+        select.textContent = '';
+        c.zones.forEach(function (z) { select.appendChild(mk('option', { value: z, text: z.replace(/_/g, ' ') })); });
+        select.value = c.time_zone || '';
+        el('ntp').value = c.ntp || '';
+      }).catch(function (e) { say('clock_msg', 'Could not load the clock settings: ' + e.message); });
+    }
+    if (el('clock_save')) {
+      el('clock_save').addEventListener('click', function () {
+        say('clock_msg', 'Saving…', true);
+        api('/api/clock', { time_zone: el('time_zone').value, ntp: el('ntp').value.trim() }).then(function () {
+          say('clock_msg', 'Saved.', true);
+          refresh();
+        }).catch(function (e) { say('clock_msg', 'Not saved: ' + e.message); });
+      });
+    }
+
     var shownConfig = null;
     infoListeners.push(function (i) {
+      if (el('clock_save') && !clockLoaded && i.os && i.os.requests) loadClock();
       if (el('clock_note')) {
         el('clock_note').textContent = i.time
           ? 'The time here is ' + i.time.slice(11, 16) + (i.time_zone ? ' (' + i.time_zone + ')' : '') + '.'

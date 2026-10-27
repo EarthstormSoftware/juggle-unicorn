@@ -104,6 +104,8 @@ class Device:
             tasks.append(asyncio.create_task(schedule.run(self)))
         if self.mqtt.enabled:
             tasks.append(asyncio.create_task(self.mqtt.run()))
+        if hasattr(self.platform, 'watchdog'):
+            tasks.append(asyncio.create_task(self.platform.watchdog()))
         if hasattr(self.product, 'tasks'):
             tasks += [asyncio.create_task(task) for task in self.product.tasks(self)]
         Log.info(TAG, '{} {} on port {}'.format(self.product.NAME, self.product.VERSION, port))

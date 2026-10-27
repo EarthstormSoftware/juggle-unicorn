@@ -4,7 +4,14 @@ The platform for an ApplPi OS app: what the OS does that a Pico does itself.
 The app's state (config.json and anything else it writes) is in APPLPI_STATE (/data/app-state), as the rest of the Pi
 is read-only. The device name is the Pi's: it's shown, not changed (SSH and applpi know the Pi by it). A restart ends
 the app, which systemd starts again.
+
+What the OS does for the app, it asks for through app-request (ApplPi OS v0.4; the app user may run it as root by
+sudo): a new version of itself, on trial; the time zone and time server; restarting the Pi. On a PC there's no
+app-request, so those aren't offered (os_requests() is False). systemd's watchdog restarts the app if its event loop
+stops (watchdog()).
 """
+import asyncio
+import json
 import os
 import socket
 import subprocess
@@ -52,7 +59,9 @@ def health():
         'uptime_s': int(float(uptime.split()[0])) if uptime else None,
         'temperature_c': round(int(temperature) / 1000, 1) if temperature else None,
         'load': round(os.getloadavg()[0], 2) if hasattr(os, 'getloadavg') else None,
-        'os': {'version': release.get('VERSION'), 'build': release.get('BUILD_STAMP'), 'slot': slot or None},
+        'os': {'version': release.get('VERSION'), 'build': release.get('BUILD_STAMP'), 'slot': slot or None,
+               'requests': os_requests()},
+        'update': update_result(),
     }
 
 
@@ -77,6 +86,102 @@ def time_zone():
     except OSError:
         return None
     return target.split('zoneinfo/', 1)[1] if 'zoneinfo/' in target else None
+
+
+APP_REQUEST = '/usr/lib/applpi/app-request'
+# How long the event loop may stop before systemd restarts the app, and how often it says it's alive
+WATCHDOG_S = 30
+WATCHDOG_EVERY_S = 10
+
+
+class RequestError(Exception):
+    pass
+
+
+def os_requests():
+    """Whether the OS takes the app's requests (ApplPi OS v0.4 or later)."""
+    return os.path.exists(APP_REQUEST)
+
+
+def _request(*args):
+    """Asks the OS (app-request); its answer, or RequestError with why not."""
+    if not os_requests():
+        raise RequestError('Only on ApplPi OS v0.4 or later.')
+    command = [APP_REQUEST, *args] if os.geteuid() == 0 else ['sudo', '-n', APP_REQUEST, *args]
+    try:
+        done = subprocess.run(command, capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError) as e:
+        raise RequestError(str(e))
+    if done.returncode != 0:
+        raise RequestError((done.stderr or done.stdout).strip() or 'app-request failed')
+    return done.stdout.strip()
+
+
+def clock_settings():
+    """{"time_zone", "ntp"} as the OS has them."""
+    return json.loads(_request('settings'))
+
+
+def set_time_zone(name):
+    _request('time-zone', name)
+    time.tzset()  # this process's local time follows at once
+
+
+def set_ntp(server):
+    _request('ntp', server)
+
+
+def time_zones():
+    """The time zones the OS knows, by name."""
+    import zoneinfo
+    return sorted(zone for zone in zoneinfo.available_timezones() if '/' in zone and not zone.startswith(('Etc/', 'SystemV/')))
+
+
+def update(data):
+    """Installs data (a .tar of the app's folder) as a new version, on trial: the OS restarts the app with it, and
+    puts this one back if it doesn't keep running. update_result() says how it went."""
+    path = state_path('update.tar')
+    temporary = path + '.new'
+    with open(temporary, 'wb') as f:
+        f.write(data)
+    os.replace(temporary, path)
+    _request('update')
+
+
+def update_result():
+    """How the last update went: {"version", "success", "message", "time"}, or None."""
+    text = _read(state_path('update-result.json'))
+    try:
+        return json.loads(text) if text else None
+    except ValueError:
+        return None
+
+
+def restart_device():
+    """Restarts the Pi."""
+    _request('restart')
+
+
+async def watchdog():
+    """Asks systemd for its watchdog, then says the event loop is alive every few seconds: if it stops (a hang), systemd
+    restarts the app. Only under systemd (NOTIFY_SOCKET)."""
+    address = os.environ.get('NOTIFY_SOCKET')
+    if not address:
+        return
+    if address.startswith('@'):
+        address = '\0' + address[1:]
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+    sock.setblocking(False)
+
+    def tell(message):
+        try:
+            sock.sendto(message, address)
+        except OSError:
+            pass
+    tell(b'WATCHDOG_USEC=%d' % (WATCHDOG_S * 1000000))
+    while True:
+        tell(b'WATCHDOG=1')
+        await asyncio.sleep(WATCHDOG_EVERY_S)
 
 
 def mqtt_client(**options):
