@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Unicorn</title>
+<!-- A small 8×8 grid of coloured squares -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='28' height='28' rx='4' fill='%2322242f'/%3E%3Cg fill='%23ff5a8c'%3E%3Ccircle cx='9' cy='9' r='3'/%3E%3Ccircle cx='23' cy='23' r='3'/%3E%3C/g%3E%3Cg fill='%235ad1ff'%3E%3Ccircle cx='23' cy='9' r='3'/%3E%3Ccircle cx='9' cy='23' r='3'/%3E%3C/g%3E%3Ccircle cx='16' cy='16' r='3' fill='%23ffd75a'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/base.css">
+<style>
+/* The preview: the HAT's 64 LEDs as they're lit now */
+.grid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;max-width:260px;margin:0 auto 8px;padding:12px;background:#08090c;border-radius:8px}
+/* Each LED glows in its own colour (set as --c), and moves smoothly between the page's checks */
+.grid span{--c:#000;aspect-ratio:1;border-radius:50%;background:var(--c);box-shadow:0 0 2px 0 var(--c);transition:background-color .1s linear,box-shadow .1s linear}
+.power{display:flex;gap:8px}
+.power .btn-full{margin-top:0}
+.slider{display:flex;align-items:center;gap:10px}
+.slider output{font-size:12px;color:var(--text2);min-width:56px;text-align:right}
+</style>
+</head>
+<body>
+<div class="card">
+<header>
+  <h1 id="name">Unicorn</h1>
+  <span class="badge" id="state">Loading&hellip;</span>
+  <div class="health" id="health"></div>
+</header>
+<div class="alert" id="alert" role="alert" hidden></div>
+<noscript><p class="noscript">This page needs JavaScript. Turn it on for this site, then reload.</p></noscript>
+
+<input type="radio" name="t" id="tc" data-pane="pc" aria-label="Control tab" checked>
+<input type="radio" name="t" id="td" data-pane="pd" aria-label="Device tab">
+<nav>
+  <label for="tc">Control</label>
+  <label for="td">Device</label>
+</nav>
+
+<div class="pane" id="pc">
+  <div class="grid" id="grid" aria-label="What the HAT shows"></div>
+  <p class="note" id="limit_note" style="text-align:center" hidden>Dimmed to stay within the power limit (Device tab).</p>
+
+  <div class="sec">Power</div>
+  <div class="power">
+    <button class="btn-full" id="on">On</button>
+    <button class="btn-full quiet" id="off">Off</button>
+  </div>
+
+  <div class="sec"><label for="brightness">Brightness</label></div>
+  <div class="slider">
+    <input type="range" id="brightness" min="1" max="100">
+    <output for="brightness" id="brightness_value"></output>
+  </div>
+
+  <div class="sec">Colour</div>
+  <div class="frow">
+    <div class="field"><label for="colour">Colour</label><input type="color" id="colour"></div>
+  </div>
+  <div class="slider">
+    <label for="kelvin" class="note" style="margin:0">White</label>
+    <input type="range" id="kelvin" min="2000" max="6500" step="100">
+    <output for="kelvin" id="kelvin_value"></output>
+  </div>
+  <p class="msg" id="control_msg" role="status"></p>
+</div>
+
+<div class="pane" id="pd">
+  <form class="settings">
+    <div class="cols">
+    <div class="group">
+      <div class="sec">The HAT</div>
+      <div class="frow">
+        <div class="field"><label for="rotation">Rotation</label>
+          <select name="device.rotation" id="rotation" data-number aria-describedby="rotation_help">
+            <option value="0">0°</option><option value="90">90°</option>
+            <option value="180">180°</option><option value="270">270°</option>
+          </select>
+        </div>
+        <div class="field"><label for="max_current">Power Limit (mA)</label>
+          <input type="number" required name="device.max_current_ma" id="max_current" min="300" max="2000" step="100" aria-describedby="limit_help">
+        </div>
+      </div>
+      <p class="note" id="rotation_help">Turns the picture to match how the HAT is mounted.</p>
+      <p class="note" id="limit_help">All 64 LEDs at full white would draw about 3.8 A, more than a Pi 2's supply gives.
+        Anything that would draw more than this is dimmed to it: 300-2000 mA (1200 suits a 2.5 A supply).</p>
+    </div>
+    <div class="group">
+      <div class="sec">At Start</div>
+      <label class="check"><input type="checkbox" name="device.default_state"> On</label>
+      <div class="frow">
+        <div class="field"><label for="default_brightness">Brightness (%)</label>
+          <input type="number" required name="device.default_brightness" id="default_brightness" min="1" max="100">
+        </div>
+        <div class="field"><label for="default_colour">Colour</label>
+          <input type="color" name="device.default_colour" id="default_colour">
+        </div>
+      </div>
+      <div class="frow">
+        <div class="field"><label for="transition">Fade (ms)</label>
+          <input type="number" required name="device.transition_ms" id="transition" min="0" max="10000" step="100" aria-describedby="fade_help">
+        </div>
+      </div>
+      <p class="note" id="fade_help">Turning on and off, and changing the brightness or colour, fade over this long (0: at once).</p>
+    </div>
+    <div class="group">
+      <div class="sec">Web Password</div>
+      <div class="frow">
+        <div class="field"><label for="password">New Password</label>
+          <input type="password" name="web.password" id="password" maxlength="64" autocomplete="new-password" aria-describedby="password_help">
+        </div>
+      </div>
+      <p class="note" id="password_help">With one, this page and the API ask for it (any username). It's sent unencrypted,
+        so it keeps out other people on your network rather than a determined attacker.</p>
+      <p class="note" data-password-set="web.password" hidden>A password is set.
+        <button type="button" class="btn-full quiet" data-clear-password="web.password">Remove the password</button></p>
+    </div>
+    <div class="group">
+      <div class="sec">Diagnostics</div>
+      <div class="frow">
+        <div class="field"><label for="log_level">Log Detail</label>
+          <select name="device.log_level" id="log_level" data-number>
+            <option value="0">Warnings and errors</option><option value="1">And info</option><option value="2">And debug</option>
+          </select>
+        </div>
+      </div>
+      <p class="note">The log is in the Pi's journal: <code>journalctl -u applpi-app</code> over SSH.</p>
+    </div>
+    </div>
+    <button class="btn-full" type="submit">Save</button>
+    <p class="msg" role="status"></p>
+  </form>
+
+  <div class="sec">The Device</div>
+  <dl class="facts">
+    <dt>Name</dt><dd id="d_name">&mdash;</dd>
+    <dt>ApplPi OS</dt><dd id="d_os">&mdash;</dd>
+    <dt>Pi up for</dt><dd id="d_up">&mdash;</dd>
+    <dt>Drawing</dt><dd id="d_current">&mdash;</dd>
+  </dl>
+  <p class="note">The name is the Pi's, which SSH knows it by: it's set when the card is flashed.</p>
+  <div class="buttons">
+    <button class="btn-full quiet" data-restart data-msg="device_msg">Restart</button>
+    <button class="btn-full danger" data-reset data-msg="device_msg" data-confirm="Reset settings? Everything on this page goes back to its default (the web password too).">Reset Settings</button>
+  </div>
+  <p class="msg" id="device_msg" role="status"></p>
+</div>
+<footer>ApplPi Unicorn &middot; Earthstorm Software</footer>
+</div>
+<script src="/base.js"></script>
+<script>
+var el = Base.el, editing = null, fadeMs = 500, quickUntil = 0;
+for (var i = 0; i < 64; i++) el('grid').appendChild(document.createElement('span'));
+
+// After a change, the preview is checked every 100 ms until the HAT's fade is over, so it fades too
+function control(path, body) {
+  return Base.api(path, body).then(function () {
+    Base.say('control_msg', '');
+    quickUntil = Date.now() + fadeMs + 400;
+    refresh();
+  }).catch(function (e) { Base.say('control_msg', e.message); });
+}
+el('on').onclick = function () { control('/api/power/on', {}); };
+el('off').onclick = function () { control('/api/power/off', {}); };
+
+// Sliders and pickers send as they move (at most every 150 ms), and aren't overwritten while in use
+function live(input, send, show) {
+  var timer = null;
+  input.addEventListener('input', function () {
+    editing = input;
+    if (show) show();
+    if (!timer) timer = setTimeout(function () { timer = null; send(); }, 150);
+  });
+  input.addEventListener('change', function () { editing = null; send(); });
+}
+live(el('brightness'), function () { control('/api/brightness', { brightness: Number(el('brightness').value) }); },
+  function () { el('brightness_value').textContent = el('brightness').value + '%'; });
+live(el('colour'), function () { control('/api/mode', { mode: 'Colour', parameters: { Colour: el('colour').value } }); });
+live(el('kelvin'), function () { control('/api/mode', { mode: 'Colour', parameters: { Kelvin: Number(el('kelvin').value) } }); },
+  function () { el('kelvin_value').textContent = el('kelvin').value + ' K'; });
+
+function showLight(i) {
+  var l = i.light;
+  el('state').textContent = l.state ? 'On' : 'Off';
+  el('state').className = l.state ? 'badge on' : 'badge';
+  // The button for the state it's in is the highlighted one
+  el('on').className = l.state ? 'btn-full' : 'btn-full quiet';
+  el('off').className = l.state ? 'btn-full quiet' : 'btn-full';
+  el('on').setAttribute('aria-pressed', l.state);
+  el('off').setAttribute('aria-pressed', !l.state);
+  if (editing !== el('brightness')) {
+    el('brightness').value = l.brightness;
+    el('brightness_value').textContent = l.brightness + '%';
+  }
+  if (l.mode === 'Colour' && editing !== el('colour') && l.parameters.Colour) el('colour').value = l.parameters.Colour;
+  if (editing !== el('kelvin')) {
+    var k = l.parameters.Kelvin;
+    el('kelvin_value').textContent = k ? k + ' K' : '';
+    if (k) el('kelvin').value = k;
+  }
+  el('limit_note').hidden = !(i.hat && i.hat.limited);
+  el('d_name').textContent = i.name + '.local';
+  el('d_os').textContent = i.os && i.os.version ? i.os.version + ' (slot ' + (i.os.slot || '?') + ')' : 'not ApplPi OS';
+  el('d_up').textContent = Base.duration(i.uptime_s);
+  el('d_current').textContent = i.hat ? 'about ' + i.hat.current_ma + ' mA' + (i.hat.connected ? '' : ' (no HAT: preview only)') : '';
+}
+
+// LEDs are far brighter than a screen: even dimmed they look nearly full. So the preview shows each colour at nearly
+// its full strength, its hue kept, and the brightness pulls it down only gently (a fourth-root curve): 61% shows at
+// about 90%, 1% at about half, and a fade to off still goes smoothly to dark.
+function lifted(hex) {
+  var c = [1, 3, 5].map(function (i) { return parseInt(hex.substr(i, 2), 16); });
+  var top = Math.max(c[0], c[1], c[2]);
+  if (!top) return '#000000';
+  var scale = 255 * Math.pow(top / 255, 0.25) / top;
+  return '#' + c.map(function (v) {
+    var s = Math.min(255, Math.round(v * scale)).toString(16);
+    return s.length < 2 ? '0' + s : s;
+  }).join('');
+}
+
+function preview() {
+  return Base.api('/api/pixels').then(function (p) {
+    var cells = el('grid').children;
+    p.pixels.forEach(function (c, n) { cells[n].style.setProperty('--c', lifted(c)); });
+  }).catch(function () {});
+}
+
+// Every second, or every 100 ms while a change fades
+(function previewLoop() {
+  preview().then(function () { setTimeout(previewLoop, Date.now() < quickUntil ? 100 : 1000); });
+})();
+
+function refresh() { Base.api('/api/info').then(showLight).catch(function () {}); }
+Base.api('/api/config').then(function (c) { fadeMs = c.device.transition_ms; }).catch(function () {});
+Base.start(showLight);
+</script>
+</body>
+</html>
