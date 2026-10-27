@@ -76,6 +76,9 @@ Rainbows, Pulse, F1 Start, Pirate Flag and CPU Chart, and alerts. Checked on the
 ### 4. Schedule and groups
 
 A Schedule tab, and the group setting on the MQTT tab, from App Base. Checked with a PlasmaStick in the same group.
+The page matches PlasmaStick's (its tabs, power switch, mode buttons and colour row, from App Base), with the
+preview above the controls and an Alert tab. The schedule uses the Pi's clock and time zone (set at flashing), so
+it has no clock settings of its own.
 
 ### 5. Finish
 

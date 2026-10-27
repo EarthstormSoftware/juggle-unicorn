@@ -88,7 +88,11 @@ def create(device):
 
     @app.get('/api/config')
     async def get_config(request):
-        return device.settings.view()
+        view = device.settings.view()
+        # Which settings restart the device when changed, so the page's Save button can say so beforehand
+        view['_restart'] = ['{}.{}'.format(section, key) for section, settings in device.settings.schema.items()
+                            for key, setting in settings.items() if setting.restart]
+        return view
 
     @app.post('/api/config')
     async def set_config(request):
@@ -135,7 +139,11 @@ def create(device):
         @app.post('/api/mode')
         async def mode(request):
             data = _json(request)
-            error = light.set(mode=data.get('mode'), parameters=data.get('parameters'))
+            parameters = data.get('parameters')
+            if data.get('mode') == 'Colour' and parameters is None:
+                # Colour with no colour: the default (the page's Default button)
+                parameters = {'Colour': device.settings.get('device', 'default_colour')}
+            error = light.set(mode=data.get('mode'), parameters=parameters)
             if error:
                 return {'success': False, 'error': error}, 400
             return {'success': True, 'mode': light.mode}

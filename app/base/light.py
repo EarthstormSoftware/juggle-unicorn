@@ -73,6 +73,8 @@ LIGHT_SETTINGS = {
         'default_brightness': Setting(66, is_int(1, 100)),
         # Turning on and off, and changing the brightness or colour, fade over this long (0: at once)
         'transition_ms': Setting(500, is_int(0, 10000)),
+        # For animations started without a speed of their own (as from Home Assistant, or a group)
+        'effect_speed': Setting(5, is_int(1, 10)),
     },
     'alert': {
         # Whether alerts interrupt the light (the switch); a test alert works either way
@@ -101,8 +103,10 @@ class Light:
         self.mode = 'Colour'
         self.parameters = {'Colour': settings.get('device', 'default_colour')}
         self.brightness = settings.get('device', 'default_brightness')
-        # Told of every change (MQTT state, groups): listener(light)
+        # Told of every change (MQTT state, groups): listener(light); light.local says whether it was made here
+        # (rather than by following a group, which isn't passed back to it)
         self.listeners = []
+        self.local = True
         self._effect = None
         # What's drawn: the level (0-1, brightness and fades) and, in Colour mode, the colour, each fading to its target
         self._level = 0.0
@@ -139,8 +143,9 @@ class Light:
         check = getattr(self.effects[mode], 'check', None)
         return check(parameters) if check else None
 
-    def set(self, on=None, mode=None, parameters=None, brightness=None, transition_ms=None):
-        """Changes what the light does; anything None stays as it is. Returns why it couldn't, or None."""
+    def set(self, on=None, mode=None, parameters=None, brightness=None, transition_ms=None, local=True):
+        """Changes what the light does; anything None stays as it is. local: made here, rather than by following a
+        group. Returns why it couldn't, or None."""
         if mode is not None or parameters is not None:
             new_mode = self.mode if mode is None else mode
             error = self.parameters_error(new_mode, parameters)
@@ -175,9 +180,13 @@ class Light:
 
         if self.state() != before:
             Log.info(TAG, 'Now {}'.format(self.state()))
-            self._told()
+            self._told(local)
         self._wake.set()
         return None
+
+    def speed(self):
+        """The current animation's speed (1-10): its own, or the setting's."""
+        return self.parameters.get('Speed') or self.settings.get('device', 'effect_speed')
 
     def alert(self, colour=None, seconds=None, on_ms=None, off_ms=None, brightness=None, test=False):
         """Starts an alert (or starts it again), with the alert settings for anything not given. Returns why it
@@ -214,9 +223,11 @@ class Light:
     def alerting(self):
         return self._alert is not None
 
-    def _told(self):
+    def _told(self, local=True):
+        self.local = local
         for listener in self.listeners:
             listener(self)
+        self.local = True
 
     def toggle(self):
         self.set(on=not self.on)

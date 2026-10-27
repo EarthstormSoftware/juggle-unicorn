@@ -17,6 +17,12 @@ The topics hang off mqtt.topic_base ({name} is the device name) and the discover
   <ha_prefix>/light/<name>/config, <ha_prefix>/sensor/<name>/<key>/config, and for alerts .../switch/<name>/alerts
                        and .../button/<name>/alert: retained discovery (if it's on)
 
+Groups (mqtt.group): lights with the same group name follow each other through a retained topic,
+earthstorm/group/<group>, carrying {"State", "Mode", "ModeParameters", "Brightness", "From"}. Each member publishes its
+own changes there (not the ones it makes following the group), and one that starts or joins takes the group's state.
+A member follows power, and brightness unless mqtt.group_brightness is off, and the mode only if it has it. Until
+PlasmaStick moves to App Base, it uses plasmastick/group/<group>: lights here publish to both and listen to both.
+
 mqtt.alert_topic, if set, is another device's topic to watch: a message on it starts an alert (see watched()), so a
 motion sensor can ring the light like a doorbell. The product can listen to topics of its own (mqtt_topics(device)
 and mqtt_message(device, topic, text)).
@@ -123,10 +129,70 @@ MQTT_SETTINGS = {
         'topic_base': Setting(DEFAULT_TOPIC_BASE, topic_base_error, restart=True),
         'ha_discovery': Setting(False, is_bool, restart=True),
         'ha_prefix': Setting(DEFAULT_HA_PREFIX, ha_prefix_error, restart=True),
+        # Lights: a group to follow ('' for none), and whether to follow its brightness
+        'group': Setting('', lambda value: group_error(value), restart=True),
+        'group_brightness': Setting(True, is_bool, restart=True),
         # Lights: another device's topic whose messages start an alert ('' for none)
         'alert_topic': Setting('', lambda value: watch_topic_error(value), restart=True),
     },
 }
+
+
+GROUP_PREFIX = 'earthstorm/group/'
+# PlasmaStick's, until it's on App Base
+OLD_GROUP_PREFIX = 'plasmastick/group/'
+_GROUP_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-'
+# The mode parameters a group passes on
+_GROUP_PARAMETERS = ('Colour', 'Kelvin', 'Speed', 'Style')
+GROUP_SETTLE_MS = 300
+
+
+def group_error(value):
+    if not isinstance(value, str) or len(value) > 32 or any(c not in _GROUP_CHARS for c in value):
+        return 'must be up to 32 letters, digits, - or _'
+    return None
+
+
+def group_payload(light, name):
+    """The group's new state after a change here: the light's state, with the parameters that define the mode."""
+    state = light.state()
+    parameters = {k: v for k, v in state['ModeParameters'].items() if k in _GROUP_PARAMETERS}
+    if 'Kelvin' in parameters:
+        parameters.pop('Colour', None)  # the temperature says it
+    return json.dumps({'State': state['State'], 'Mode': state['Mode'], 'ModeParameters': parameters,
+                       'Brightness': state['Brightness'], 'From': name})
+
+
+def group_change(payload, light, follow_brightness):
+    """What following the group's state changes, as keyword arguments for Light.set: only what differs, so a light's
+    own message coming back changes nothing, and an animation isn't started again. A mode the light doesn't have is
+    left out (it keeps its own). Raises ValueError for a state it can't use."""
+    if not isinstance(payload, dict):
+        raise ValueError('a group state must be a JSON object')
+    state, mode, brightness = payload.get('State'), payload.get('Mode'), payload.get('Brightness')
+    parameters = payload.get('ModeParameters') or {}
+    if not isinstance(state, bool):
+        raise ValueError('State must be true or false')
+    if isinstance(brightness, bool) or not isinstance(brightness, int) or not 1 <= brightness <= 100:
+        raise ValueError('Brightness must be 1-100')
+    if not isinstance(parameters, dict):
+        raise ValueError('ModeParameters must be an object')
+    change = {}
+    if state != light.on:
+        change['on'] = state
+    if mode in light.modes:
+        wanted = {k: v for k, v in parameters.items() if k in _GROUP_PARAMETERS}
+        if 'Kelvin' in wanted:
+            wanted.pop('Colour', None)
+        if light.parameters_error(mode, wanted):
+            wanted = {}
+        differs = any(str(v).lower() != str(light.parameters.get(k)).lower() for k, v in wanted.items())
+        if mode != light.mode or differs:
+            change['mode'] = mode
+            change['parameters'] = wanted or None
+    if follow_brightness and brightness != light.brightness:
+        change['brightness'] = brightness
+    return change
 
 
 def watch_topic_error(value):
@@ -136,7 +202,7 @@ def watch_topic_error(value):
     return None
 
 
-def topics(name, base=DEFAULT_TOPIC_BASE, ha_prefix=DEFAULT_HA_PREFIX, light=False, sensors=()):
+def topics(name, base=DEFAULT_TOPIC_BASE, ha_prefix=DEFAULT_HA_PREFIX, light=False, sensors=(), group=''):
     """The device's topics by role."""
     base = base.replace('{name}', name)
     t = {'status': base + '/status', 'info': base + '/info'}
@@ -153,6 +219,10 @@ def topics(name, base=DEFAULT_TOPIC_BASE, ha_prefix=DEFAULT_HA_PREFIX, light=Fal
             'ha_alerts': ha_prefix + '/switch/' + name + '/alerts/config',
             'ha_alert': ha_prefix + '/button/' + name + '/alert/config',
         })
+        if group:
+            # Not retained by this light alone (the others use it too), so never cleared
+            t['group'] = GROUP_PREFIX + group
+            t['group_old'] = OLD_GROUP_PREFIX + group
     for key in sensors:
         t['ha_sensor_' + key] = ha_prefix + '/sensor/' + name + '/' + key + '/config'
     return t
@@ -160,7 +230,7 @@ def topics(name, base=DEFAULT_TOPIC_BASE, ha_prefix=DEFAULT_HA_PREFIX, light=Fal
 
 def retained(t):
     """The topics in t that the device publishes retained."""
-    return sorted(topic for role, topic in t.items() if role not in ('control', 'ha_set', 'alert', 'alert_set'))
+    return sorted(topic for role, topic in t.items() if role not in ('control', 'ha_set', 'alert', 'alert_set', 'group', 'group_old'))
 
 
 # Payloads
@@ -385,13 +455,20 @@ class Mqtt:
         self.light = device.light
         info = device.info()
         self.sensors = tuple(key for key, _, _ in SENSORS if info.get(key) is not None)
+        self.group = s.get('mqtt', 'group') if self.light is not None else ''
         self.topics = topics(self.name, s.get('mqtt', 'topic_base'), s.get('mqtt', 'ha_prefix'),
-                             light=self.light is not None, sensors=self.sensors)
+                             light=self.light is not None, sensors=self.sensors, group=self.group)
         self.alert_topic = s.get('mqtt', 'alert_topic') if self.light is not None else ''
         self._watched_before = False  # whether the watched topic last said "now", so one that stays "now" rings once
         self._changed = asyncio.Event()
+        self._group_changed = asyncio.Event()
         if self.light is not None:
-            self.light.listeners.append(lambda light: self._changed.set())
+            self.light.listeners.append(self._light_changed)
+
+    def _light_changed(self, light):
+        self._changed.set()
+        if light.local and self.group:
+            self._group_changed.set()
 
     def status(self):
         return {'enabled': self.enabled, 'connected': self.connected, 'error': self.error}
@@ -413,7 +490,8 @@ class Mqtt:
                 Log.info(TAG, 'Connected to {}:{}'.format(host, port))
                 await self._up(client)
                 tasks = [asyncio.create_task(self._publish_state(client)),
-                         asyncio.create_task(self._publish_info(client))]
+                         asyncio.create_task(self._publish_info(client)),
+                         asyncio.create_task(self._publish_group(client))]
                 await self._receive(client)
                 self.error = 'The connection to the broker dropped.'
             except Exception as e:  # anything a broker, or the network, can do: try again
@@ -447,6 +525,11 @@ class Mqtt:
                 await client.publish(t[role], payload() if self.ha else '', retain=True)
         for topic in self._product_topics():
             await client.subscribe(topic)
+        if self.group:
+            # The group's retained state arrives straight away, and the light takes it: PlasmaStick's topic second,
+            # as it's the one they use until they're on App Base
+            await client.subscribe(t['group'])
+            await client.subscribe(t['group_old'])
         for key in self.sensors:
             await client.publish(t['ha_sensor_' + key], ha_sensor_payload(self.name, t, self.device.product, key)
                                  if self.ha else '', retain=True)
@@ -489,6 +572,23 @@ class Mqtt:
             while True:
                 await asyncio.sleep(INFO_INTERVAL_S)
                 await self._send_info(client)
+        except OSError:
+            client.close()
+
+    async def _publish_group(self, client):
+        """Passes changes made here to the group, as its new state: a moment after each, so dragging a slider makes
+        one message rather than dozens."""
+        if not self.group:
+            return
+        self._group_changed.clear()  # what happened while disconnected: the group's state wins on joining
+        try:
+            while True:
+                await self._group_changed.wait()
+                await asyncio.sleep(GROUP_SETTLE_MS / 1000)
+                self._group_changed.clear()
+                payload = group_payload(self.light, self.name)
+                await client.publish(self.topics['group'], payload, retain=True)
+                await client.publish(self.topics['group_old'], payload, retain=True)
         except OSError:
             client.close()
 
@@ -545,6 +645,9 @@ class Mqtt:
                 self.device.applied(changed)
             self._changed.set()  # the switch's state, even if it didn't change
             return error
+        if topic in (t.get('group'), t.get('group_old')):
+            change = group_change(json.loads(text), light, self.device.settings.get('mqtt', 'group_brightness'))
+            return light.set(local=False, **change) if change else None
         if self.alert_topic and topic_matches(self.alert_topic, topic):
             now = watched(text)
             ring = now and not self._watched_before and not retained

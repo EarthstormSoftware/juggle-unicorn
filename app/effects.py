@@ -2,7 +2,8 @@
 The Unicorn's modes beyond Colour, as App Base effects: each is made with (count, parameters, light) and gives
 frame(now) -> 64 (r, g, b) in reading order ((0, 0) top left), at full brightness; the light scales them.
 
-Rainbows, Pulse and Pirate Flag take a Speed (1-10, 5 by default); Pulse also a Colour.
+Rainbows, Pulse and Pirate Flag take a Speed (1-10; without one, the light's Animation Speed setting); Pulse also a
+Colour.
 """
 import math
 import random
@@ -11,10 +12,6 @@ from base.light import rgb
 
 SIZE = 8
 OFF = (0, 0, 0)
-
-
-def _speed(parameters):
-    return parameters.get('Speed') or 5
 
 
 def _hsv(h, s, v):
@@ -30,13 +27,14 @@ class Rainbows:
 
     def __init__(self, count, parameters, light):
         self.parameters = parameters
+        self.light = light
         self.start = None
 
     def frame(self, now):
         if self.start is None:
             self.start = now
         # Speed 5: once through the colours every 4 s
-        turn = (now - self.start) / 1000 * 0.05 * _speed(self.parameters)
+        turn = (now - self.start) / 1000 * 0.05 * self.light.speed()
         return [_hsv(((x + y) / 28 + turn) % 1, 1, 1) for y in range(SIZE) for x in range(SIZE)]
 
 
@@ -46,6 +44,7 @@ class Pulse:
 
     def __init__(self, count, parameters, light):
         self.parameters = parameters
+        self.light = light
         self.start = None
 
     def frame(self, now):
@@ -53,7 +52,7 @@ class Pulse:
             self.start = now
         colour = rgb(self.parameters.get('Colour') or self.COLOUR)
         # Speed 5: a pulse every 0.8 s; the glow's width (at half strength) between 0.6 and 5 LEDs
-        period = 4000 / _speed(self.parameters)
+        period = 4000 / self.light.speed()
         phase = ((now - self.start) % period) / period
         width = 0.6 + 4.4 * (0.5 - 0.5 * math.cos(2 * math.pi * phase))
         spread = -4 * math.log(2) / (width * width)
@@ -121,12 +120,13 @@ class PirateFlag:
 
     def __init__(self, count, parameters, light):
         self.parameters = parameters
+        self.light = light
         self.start = None
 
     def frame(self, now):
         if self.start is None:
             self.start = now
-        step_ms = 1000 / _speed(self.parameters)  # speed 5: 0.2 s a step
+        step_ms = 1000 / self.light.speed()  # speed 5: 0.2 s a step
         cycle = 2 * self.HOLD_MS + step_ms * len(_FLAG_STEPS)
         t = (now - self.start) % cycle
         steps = 0 if t < self.HOLD_MS else min(len(_FLAG_STEPS), int((t - self.HOLD_MS) // step_ms) + 1)

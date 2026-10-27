@@ -65,3 +65,42 @@ button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outli
 details{margin:4px 0 8px}
 summary{font-size:12px;font-weight:600;color:var(--accent);cursor:pointer;padding:4px 0;margin-bottom:6px}
 footer{font-size:11px;color:var(--muted);text-align:center;padding:10px 0 14px}
+/* A light's controls (as PlasmaStick's): they keep a phone-like width; the settings use the whole card */
+#pc{max-width:540px;margin:0 auto}
+/* Power switch */
+.power{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.power .sec{margin:0}
+.switch{position:relative;width:58px;height:32px;padding:0;border:none;border-radius:16px;background:var(--off);cursor:pointer;transition:.15s;flex:none}
+.switch::after{content:"";position:absolute;top:4px;left:4px;width:24px;height:24px;border-radius:50%;background:#fff;transition:.15s}
+.switch[aria-checked=true]{background:var(--on)}
+.switch[aria-checked=true]::after{left:30px}
+/* Sliders with their value */
+.bright{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.bright input[type=range]{flex:1;height:28px}
+.bright output{font-size:13px;color:var(--text2);min-width:40px;text-align:right}
+/* White: a warm-to-cool track for the colour temperature */
+.warmth{background:linear-gradient(to right,#ff890e,#ffb16e,#ffe4ce,#fffefa);border-radius:6px}
+/* Mode buttons, three to a row */
+.modes{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}
+.modes button{padding:9px 6px;border:1.5px solid var(--border);border-radius:7px;background:var(--field);cursor:pointer;font-size:13px;font-weight:700;color:var(--text2)}
+.modes button[aria-pressed=true]{border-color:var(--accent);background:var(--accent);color:var(--on-accent)}
+/* A colour picker in a row with its label and buttons */
+.crow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.crow label{font-size:13px;color:var(--text2);flex:1}
+.crow input[type=color]{width:44px;height:36px;flex:none}
+.crow input[type=text]{flex:1}
+.reset{display:flex;align-items:center;gap:6px;padding:7px 12px;border:1.5px solid var(--border);border-radius:7px;background:var(--field);color:var(--text2);font-size:13px;font-weight:700;cursor:pointer}
+.reset:disabled{opacity:.5;cursor:default}
+.swatch{width:14px;height:14px;border-radius:3px;border:1px solid var(--border);background:#fff}
+input[type=color]:disabled{opacity:.4;cursor:default}
+/* Schedule events: a card each, their fields wrapping on a phone */
+.event{border:1.5px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.event select,.event input[type=time],.event input[type=number]{width:auto}
+.event input[type=number]{width:72px}
+.event input[type=time]{padding:7px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;background:var(--field);color:var(--text)}
+.days{display:flex;gap:2px;flex-basis:100%}
+.days label{display:flex;flex-direction:column;align-items:center;font-size:11px;color:var(--text2);min-width:26px}
+.event .remove{margin-left:auto}
+/* MQTT topics shown under the topic base */
+.topics div{overflow-wrap:anywhere;margin-bottom:2px}
+.topics code{font-size:12px;color:var(--text2)}

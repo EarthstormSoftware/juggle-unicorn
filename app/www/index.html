@@ -11,11 +11,8 @@
 .grid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;max-width:260px;margin:0 auto 8px;padding:12px;background:#08090c;border-radius:8px}
 /* Each LED glows in its own colour (set as --c), and moves smoothly between the page's checks */
 .grid span{--c:#000;aspect-ratio:1;border-radius:50%;background:var(--c);box-shadow:0 0 2px 0 var(--c);transition:background-color .1s linear,box-shadow .1s linear}
-.power{display:flex;gap:8px}
-.power .btn-full{margin-top:0}
-.slider{display:flex;align-items:center;gap:10px}
-.slider output{font-size:12px;color:var(--text2);min-width:56px;text-align:right}
-/* The broker's details only while MQTT is on */
+.buttons{margin-bottom:8px}
+/* With MQTT off there's nothing else to set */
 form:has(#mqtt_enabled:not(:checked)) .mqtt-more{display:none}
 form:has(#mqtt_enabled:checked) .mqtt-off{display:none}
 </style>
@@ -31,69 +28,284 @@ form:has(#mqtt_enabled:checked) .mqtt-off{display:none}
 <noscript><p class="noscript">This page needs JavaScript. Turn it on for this site, then reload.</p></noscript>
 
 <input type="radio" name="t" id="tc" data-pane="pc" aria-label="Control tab" checked>
-<input type="radio" name="t" id="ta" data-pane="pa" aria-label="Alert tab">
-<input type="radio" name="t" id="tm" data-pane="pm" aria-label="MQTT tab">
 <input type="radio" name="t" id="td" data-pane="pd" aria-label="Device tab">
+<input type="radio" name="t" id="tm" data-pane="pm" aria-label="MQTT tab">
+<input type="radio" name="t" id="ts" data-pane="ps" aria-label="Schedule tab">
+<input type="radio" name="t" id="ta" data-pane="pa" aria-label="Alert tab">
 <nav>
   <label for="tc">Control</label>
-  <label for="ta">Alert</label>
-  <label for="tm">MQTT</label>
   <label for="td">Device</label>
+  <label for="tm">MQTT</label>
+  <label for="ts">Schedule</label>
+  <label for="ta">Alert</label>
 </nav>
 
+<!-- CONTROL PANEL -->
 <div class="pane" id="pc">
   <div class="grid" id="grid" aria-label="What the HAT shows"></div>
   <p class="note" id="limit_note" style="text-align:center" hidden>Dimmed to stay within the power limit (Device tab).</p>
 
-  <div class="sec">Power</div>
   <div class="power">
-    <button class="btn-full" id="on">On</button>
-    <button class="btn-full quiet" id="off">Off</button>
+    <div class="sec">Power</div>
+    <button type="button" class="switch" id="power" role="switch" aria-checked="false" aria-label="Light on"></button>
   </div>
 
   <div class="sec"><label for="brightness">Brightness</label></div>
-  <div class="slider">
-    <input type="range" id="brightness" min="1" max="100">
-    <output for="brightness" id="brightness_value"></output>
+  <div class="bright">
+    <input type="range" id="brightness" min="1" max="100" value="100">
+    <output id="brightness_text" for="brightness">100%</output>
   </div>
 
   <div class="sec">Mode</div>
-  <div class="frow">
-    <div class="field"><label for="mode">Mode</label>
-      <select id="mode" aria-describedby="mode_help">
-        <option>Colour</option><option>Rainbows</option><option>Pulse</option>
-        <option>F1 Start</option><option>Pirate Flag</option><option>CPU Chart</option>
-      </select>
-    </div>
-  </div>
-  <p class="note" id="mode_help"></p>
-  <button class="btn-full" id="f1_go" hidden>Start the lights</button>
-  <div class="slider" id="speed_row" hidden>
+  <!-- Filled in from the light's modes (/api/info) -->
+  <div class="modes" id="modes" role="group" aria-label="Mode"></div>
+  <p class="note" id="mode_help" hidden></p>
+  <button type="button" class="btn-full" id="f1_go" style="margin:0 0 12px" hidden>Start the lights</button>
+  <!-- Animations only -->
+  <div class="bright" id="speed_row" hidden>
     <label for="speed" class="note" style="margin:0">Speed</label>
-    <input type="range" id="speed" min="1" max="10">
-    <output for="speed" id="speed_value"></output>
+    <input type="range" id="speed" min="1" max="10" value="5">
+    <output id="speed_text" for="speed">5</output>
   </div>
-  <div class="frow" id="colour_row">
-    <div class="field"><label for="colour">Colour</label><input type="color" id="colour"></div>
+  <div class="crow" id="colour_row">
+    <input type="color" id="colour" value="#ffb46b">
+    <label for="colour" id="colour_text">Colour</label>
+    <button type="button" class="reset" id="default_btn" title="Return to the default colour">
+      <span class="swatch" id="default_swatch"></span>Default
+    </button>
+    <button type="button" class="reset" id="set_default_btn" title="Make the colour showing now the default">Set as default</button>
   </div>
-  <div class="slider" id="kelvin_row">
+  <div class="bright" id="white_row">
     <label for="kelvin" class="note" style="margin:0">White</label>
-    <input type="range" id="kelvin" min="2000" max="6500" step="100">
-    <output for="kelvin" id="kelvin_value"></output>
+    <input type="range" id="kelvin" class="warmth" min="2000" max="6500" step="100" value="3000">
+    <output id="kelvin_text" for="kelvin">3000 K</output>
   </div>
-  <p class="msg" id="control_msg" role="status"></p>
+  <p class="msg" id="msg" role="status" aria-live="polite"></p>
 </div>
 
-<div class="pane" id="pa">
-  <label class="check"><input type="checkbox" id="alerts_on"> Alerts</label>
-  <p class="note">When alerts are on, an alert interrupts whatever the light is doing, even when it's off: it flashes,
-    then the light carries on as it was. Alerts come from the topic below, from Home Assistant's Alert button, or
-    from the API (<code>POST /api/alert</code>) or MQTT (<code>&lt;base&gt;/alert</code>).</p>
-  <div class="power">
-    <button class="btn-full quiet" id="alert_test">Test</button>
-    <button class="btn-full quiet" id="alert_stop">Stop</button>
+<!-- DEVICE PANEL -->
+<div class="pane" id="pd">
+  <form class="settings">
+    <div class="cols">
+    <div class="group">
+      <div class="sec">Identity</div>
+      <div class="frow">
+        <div class="field"><label for="device_name">Device Name</label>
+          <input type="text" id="device_name" aria-describedby="name_help" disabled>
+        </div>
+      </div>
+      <p class="note" id="name_help">The Pi's name, which SSH knows it by: it's set when the card is flashed.</p>
+      <div class="sec">LED Hardware</div>
+      <div class="frow">
+        <div class="field"><label for="rotation">Rotation</label>
+          <select name="device.rotation" id="rotation" data-number aria-describedby="rotation_help">
+            <option value="0">0°</option><option value="90">90°</option>
+            <option value="180">180°</option><option value="270">270°</option>
+          </select>
+        </div>
+        <div class="field"><label for="max_current">Power Limit (mA)</label>
+          <input type="number" required name="device.max_current_ma" id="max_current" min="300" max="2000" step="100" aria-describedby="limit_help">
+        </div>
+      </div>
+      <p class="note" id="rotation_help">Rotation turns the picture to match how the HAT is mounted (0°: the Pi's USB ports on the left).</p>
+      <p class="note" id="limit_help">All 64 LEDs at full white would draw about 3.8 A, more than a Pi 2's supply gives:
+        anything that would draw more than the limit is dimmed to it (1200 suits a 2.5 A supply).</p>
+    </div>
+    <div class="group">
+      <div class="sec">At Power-up</div>
+      <label class="check"><input type="checkbox" name="device.default_state" id="default_state"> Turn the light on</label>
+      <div class="frow">
+        <div class="field"><label for="default_mode">Mode</label>
+          <select name="device.default_mode" id="default_mode"></select>
+        </div>
+        <div class="field"><label for="default_brightness">Brightness (%)</label>
+          <input type="number" required name="device.default_brightness" id="default_brightness" min="1" max="100">
+        </div>
+      </div>
+      <div class="frow">
+        <div class="field"><label for="effect_speed">Animation Speed (1-10)</label>
+          <input type="number" required name="device.effect_speed" id="effect_speed" min="1" max="10" aria-describedby="speed_help">
+        </div>
+      </div>
+      <p class="note" id="speed_help">For animations started without a speed of their own, as from Home Assistant. 5 is the usual pace.</p>
+      <div class="frow">
+        <div class="field"><label for="transition_ms">Fade Time (ms)</label>
+          <input type="number" required name="device.transition_ms" id="transition_ms" min="0" max="10000" step="100" aria-describedby="fade_help">
+        </div>
+      </div>
+      <p class="note" id="fade_help">Turning on and off, and changing brightness or colour, fade over this time. 0: instant. Home Assistant can ask for its own.</p>
+      <div class="frow">
+        <div class="field"><label for="default_colour">Colour</label>
+          <input type="color" name="device.default_colour" id="default_colour" value="#ffb46b">
+        </div>
+      </div>
+    </div>
+    <div class="group">
+      <div class="sec">CPU Chart</div>
+      <div class="frow">
+        <div class="field"><label for="chart_topic">MQTT Topic</label>
+          <input type="text" name="chart.topic" id="chart_topic" maxlength="200" placeholder="none" spellcheck="false" autocapitalize="off" aria-describedby="chart_help">
+        </div>
+      </div>
+      <div class="frow">
+        <div class="field"><label for="chart_field">Field</label>
+          <input type="text" name="chart.field" id="chart_field" maxlength="40" spellcheck="false" autocapitalize="off">
+        </div>
+        <div class="field"><label for="chart_full">Full Column</label>
+          <input type="number" required name="chart.full_scale" id="chart_full" min="1">
+        </div>
+      </div>
+      <p class="note" id="chart_help">Each message on the topic adds a column: the field's value in its JSON (or the
+        message, if it's a number), where Full Column fills it (100 for a percentage).</p>
+    </div>
+    <div class="group">
+      <div class="sec">Web Access</div>
+      <div class="frow">
+        <div class="field"><label for="web_password">Password</label>
+          <input type="password" name="web.password" id="web_password" maxlength="64" placeholder="leave blank to keep" autocomplete="new-password" aria-describedby="web_password_help">
+        </div>
+      </div>
+      <p class="note" data-password-set="web.password" hidden>A password is set.
+        <button type="button" class="reset" data-clear-password="web.password">Remove the password</button></p>
+      <p class="note" id="web_password_help">With a password set, the browser asks for it (any username). It's sent
+        unencrypted, so it keeps out other people on your network rather than a determined attacker.</p>
+    </div>
+    <div class="group">
+      <div class="sec">Diagnostics</div>
+      <div class="frow">
+        <div class="field"><label for="log_level">Log Level (the Pi's journal)</label>
+          <select name="device.log_level" id="log_level" data-number>
+            <option value="0">Warnings and errors</option>
+            <option value="1">Info</option>
+            <option value="2">Debug</option>
+          </select>
+        </div>
+      </div>
+      <p class="note">Over SSH: <code>journalctl -u applpi-app</code>.</p>
+    </div>
+    </div>
+    <button type="submit" class="btn-full save" disabled>Save</button>
+    <p class="msg" role="status" aria-live="polite"></p>
+  </form>
+
+  <div class="sec">Restart and Reset</div>
+  <p class="note">Reset puts every setting on these pages back to its default (the web password too). The Pi's name and
+    Wi-Fi network stay: they're set when the card is flashed.</p>
+  <div class="buttons">
+    <button type="button" class="btn-full quiet" data-restart data-msg="reset_msg">Restart</button>
+    <button type="button" class="btn-full danger" data-reset data-msg="reset_msg" data-confirm="Reset all settings to their defaults? The app restarts.">Reset settings</button>
   </div>
-  <p class="msg" id="alert_msg" role="status"></p>
+  <p class="msg" id="reset_msg" role="status" aria-live="polite"></p>
+</div>
+
+<!-- MQTT PANEL -->
+<div class="pane" id="pm">
+  <form class="settings">
+    <label class="check"><input type="checkbox" name="mqtt.enabled" id="mqtt_enabled"> Connect to an MQTT broker</label>
+    <p class="note mqtt-off">MQTT lets home automation software such as Home Assistant or Node-RED control the light.</p>
+    <div class="cols mqtt-more">
+    <div class="group">
+      <div class="sec">Broker</div>
+      <div class="frow">
+        <div class="field"><label for="broker_address">Address</label>
+          <input type="text" name="mqtt.broker_address" id="broker_address" maxlength="100" placeholder="host or host:port" spellcheck="false" autocapitalize="off">
+        </div>
+      </div>
+      <div class="frow">
+        <div class="field"><label for="mqtt_user">Username</label>
+          <input type="text" name="mqtt.user" id="mqtt_user" maxlength="64" autocomplete="off" spellcheck="false" autocapitalize="off">
+        </div>
+        <div class="field"><label for="mqtt_password">Password</label>
+          <input type="password" name="mqtt.password" id="mqtt_password" maxlength="64" placeholder="leave blank to keep" autocomplete="new-password">
+        </div>
+      </div>
+      <p class="note" data-password-set="mqtt.password" hidden>A password is set.
+        <button type="button" class="reset" data-clear-password="mqtt.password">Remove the password</button></p>
+    </div>
+    <div class="group">
+      <div class="sec">Topics</div>
+      <div class="frow">
+        <div class="field"><label for="topic_base">Topic Base</label>
+          <input type="text" required name="mqtt.topic_base" id="topic_base" maxlength="100" placeholder="/home/device/{name}" aria-describedby="topic_help topic_preview" spellcheck="false" autocapitalize="off">
+        </div>
+      </div>
+      <p class="note" id="topic_help">{name} becomes the device name. Topics no longer used are cleared from the broker after the restart.</p>
+      <div class="note topics" id="topic_preview"></div>
+    </div>
+    <div class="group">
+      <div class="sec">Group</div>
+      <div class="frow">
+        <div class="field"><label for="mqtt_group">Group Name</label>
+          <input type="text" name="mqtt.group" id="mqtt_group" maxlength="32" placeholder="not in a group" aria-describedby="group_help" spellcheck="false" autocapitalize="off">
+        </div>
+      </div>
+      <label class="check"><input type="checkbox" name="mqtt.group_brightness" id="group_brightness"> Follow the group's brightness</label>
+      <p class="note" id="group_help">Devices with the same group name follow each other: turn one on, or change its
+        mode or colour, and the rest do the same (PlasmaSticks too). A mode another device doesn't have is ignored by it. Letters, digits, - and _.</p>
+    </div>
+    <div class="group">
+      <div class="sec">Home Assistant</div>
+      <label class="check"><input type="checkbox" name="mqtt.ha_discovery" id="ha_discovery"> Announce the light to Home Assistant</label>
+      <div class="frow">
+        <div class="field"><label for="ha_prefix">Discovery Prefix</label>
+          <input type="text" required name="mqtt.ha_prefix" id="ha_prefix" maxlength="100" placeholder="homeassistant" aria-describedby="ha_help" spellcheck="false" autocapitalize="off">
+        </div>
+      </div>
+      <p class="note" id="ha_help">Home Assistant adds the light automatically (MQTT discovery), with an Alert button and
+        an Alerts switch. Turning this off removes it again. Only change the prefix if Home Assistant's has been changed.</p>
+    </div>
+    </div>
+    <button type="submit" class="btn-full save" disabled>Save</button>
+    <p class="msg" role="status" aria-live="polite"></p>
+  </form>
+</div>
+
+<!-- SCHEDULE PANEL -->
+<div class="pane" id="ps">
+  <form class="settings">
+    <div class="cols">
+    <div class="group">
+      <div class="sec">Clock</div>
+      <p class="note" id="clock_note"></p>
+      <p class="note">The Pi keeps its own clock, from the internet, in the time zone set when its card was flashed;
+        summer time follows that zone.</p>
+    </div>
+    <div class="group">
+      <div class="sec">Location</div>
+      <div class="frow">
+        <div class="field"><label for="latitude">Latitude</label>
+          <input type="number" name="schedule.latitude" id="latitude" min="-90" max="90" step="any" placeholder="e.g. 51.5">
+        </div>
+        <div class="field"><label for="longitude">Longitude</label>
+          <input type="number" name="schedule.longitude" id="longitude" min="-180" max="180" step="any" placeholder="e.g. -0.13">
+        </div>
+      </div>
+      <p class="note" id="sun_note">For sunrise and sunset events. East and north are positive.</p>
+    </div>
+    </div>
+    <div class="sec">Events</div>
+    <div id="events"></div>
+    <button type="button" class="reset" id="add_event">+ Add event</button>
+    <p class="note" style="margin-top:8px">Up to 8. Events act like any other change, so a group follows them. After a restart the light does what the latest event said.</p>
+    <button type="submit" class="btn-full save" disabled>Save</button>
+    <p class="msg" role="status" aria-live="polite"></p>
+  </form>
+</div>
+
+<!-- ALERT PANEL -->
+<div class="pane" id="pa">
+  <div class="power">
+    <div class="sec">Alerts</div>
+    <button type="button" class="switch" id="alerts" role="switch" aria-checked="false" aria-label="Alerts on"></button>
+  </div>
+  <p class="note">With alerts on, an alert interrupts whatever the light is doing, even when it's off: it flashes, then
+    the light carries on as it was. Alerts come from the topic watched below, Home Assistant's Alert button, MQTT
+    (<code>&lt;base&gt;/alert</code>) or the API (<code>POST /api/alert</code>).</p>
+  <div class="buttons">
+    <button type="button" class="btn-full quiet" id="alert_test">Test</button>
+    <button type="button" class="btn-full quiet" id="alert_stop">Stop</button>
+  </div>
+  <p class="msg" id="alert_msg" role="status" aria-live="polite"></p>
 
   <form class="settings">
     <div class="cols">
@@ -128,292 +340,85 @@ form:has(#mqtt_enabled:checked) .mqtt-off{display:none}
         </div>
       </div>
       <p class="note" id="watch_help">Another device's topic, such as a motion sensor's <code>/home/device/pir/state</code>:
-        an alert starts when it says something has happened (motion true, ON, true, or any other message), once
-        until it clears. Needs MQTT; saving a new topic restarts the app.</p>
+        an alert starts when it says something has happened (motion true, ON, true, or any other message), once until
+        it clears. Needs MQTT.</p>
     </div>
     </div>
-    <button class="btn-full" type="submit">Save</button>
-    <p class="msg" role="status"></p>
+    <button type="submit" class="btn-full save" disabled>Save</button>
+    <p class="msg" role="status" aria-live="polite"></p>
   </form>
 </div>
 
-<div class="pane" id="pm">
-  <form class="settings">
-    <label class="check"><input type="checkbox" name="mqtt.enabled" id="mqtt_enabled"> Connect to an MQTT broker</label>
-    <p class="note mqtt-off">MQTT lets home automation software such as Home Assistant or Node-RED control the light.</p>
-    <div class="cols mqtt-more">
-    <div class="group">
-      <div class="sec">Broker</div>
-      <div class="frow">
-        <div class="field"><label for="broker_address">Address</label>
-          <input type="text" name="mqtt.broker_address" id="broker_address" maxlength="100" placeholder="host or host:port" spellcheck="false" autocapitalize="off">
-        </div>
-      </div>
-      <div class="frow">
-        <div class="field"><label for="mqtt_user">Username</label>
-          <input type="text" name="mqtt.user" id="mqtt_user" maxlength="64" autocomplete="off" spellcheck="false" autocapitalize="off">
-        </div>
-        <div class="field"><label for="mqtt_password">Password</label>
-          <input type="password" name="mqtt.password" id="mqtt_password" maxlength="64" placeholder="leave blank to keep" autocomplete="new-password">
-        </div>
-      </div>
-      <p class="note" data-password-set="mqtt.password" hidden>A password is set.
-        <button type="button" class="btn-full quiet" data-clear-password="mqtt.password">Remove the password</button></p>
-    </div>
-    <div class="group">
-      <div class="sec">Topics</div>
-      <div class="frow">
-        <div class="field"><label for="topic_base">Topic Base</label>
-          <input type="text" required name="mqtt.topic_base" id="topic_base" maxlength="100" placeholder="/home/device/{name}" aria-describedby="topic_help" spellcheck="false" autocapitalize="off">
-        </div>
-      </div>
-      <p class="note" id="topic_help">{name} becomes the device name. The light listens on &lt;base&gt;/control and
-        reports on &lt;base&gt;/state, as PlasmaStick does. Topics no longer used are cleared from the broker.</p>
-    </div>
-    <div class="group">
-      <div class="sec">Home Assistant</div>
-      <label class="check"><input type="checkbox" name="mqtt.ha_discovery" id="ha_discovery"> Announce the light to Home Assistant</label>
-      <div class="frow">
-        <div class="field"><label for="ha_prefix">Discovery Prefix</label>
-          <input type="text" required name="mqtt.ha_prefix" id="ha_prefix" maxlength="100" placeholder="homeassistant" aria-describedby="ha_help" spellcheck="false" autocapitalize="off">
-        </div>
-      </div>
-      <p class="note" id="ha_help">Home Assistant adds the light automatically (MQTT discovery). Turning this off removes
-        it again. Only change the prefix if Home Assistant's has been changed.</p>
-    </div>
-    </div>
-    <button class="btn-full" type="submit">Save</button>
-    <p class="msg" role="status"></p>
-  </form>
-</div>
-
-<div class="pane" id="pd">
-  <form class="settings">
-    <div class="cols">
-    <div class="group">
-      <div class="sec">The HAT</div>
-      <div class="frow">
-        <div class="field"><label for="rotation">Rotation</label>
-          <select name="device.rotation" id="rotation" data-number aria-describedby="rotation_help">
-            <option value="0">0°</option><option value="90">90°</option>
-            <option value="180">180°</option><option value="270">270°</option>
-          </select>
-        </div>
-        <div class="field"><label for="max_current">Power Limit (mA)</label>
-          <input type="number" required name="device.max_current_ma" id="max_current" min="300" max="2000" step="100" aria-describedby="limit_help">
-        </div>
-      </div>
-      <p class="note" id="rotation_help">Turns the picture to match how the HAT is mounted.</p>
-      <p class="note" id="limit_help">All 64 LEDs at full white would draw about 3.8 A, more than a Pi 2's supply gives.
-        Anything that would draw more than this is dimmed to it: 300-2000 mA (1200 suits a 2.5 A supply).</p>
-    </div>
-    <div class="group">
-      <div class="sec">CPU Chart</div>
-      <div class="frow">
-        <div class="field"><label for="chart_topic">MQTT Topic</label>
-          <input type="text" name="chart.topic" id="chart_topic" maxlength="200" placeholder="none" spellcheck="false" autocapitalize="off" aria-describedby="chart_help">
-        </div>
-      </div>
-      <div class="frow">
-        <div class="field"><label for="chart_field">Field</label>
-          <input type="text" name="chart.field" id="chart_field" maxlength="40" spellcheck="false" autocapitalize="off">
-        </div>
-        <div class="field"><label for="chart_full">Full Column</label>
-          <input type="number" required name="chart.full_scale" id="chart_full" min="1">
-        </div>
-      </div>
-      <p class="note" id="chart_help">Each message on the topic adds a column: the field's value in its JSON (or the
-        message, if it's a number), where Full Column fills it (100 for a percentage). Saving a new topic restarts the app.</p>
-    </div>
-    <div class="group">
-      <div class="sec">At Start</div>
-      <label class="check"><input type="checkbox" name="device.default_state"> On</label>
-      <div class="frow">
-        <div class="field"><label for="default_mode">Mode</label>
-          <select name="device.default_mode" id="default_mode">
-            <option>Colour</option><option>Rainbows</option><option>Pulse</option>
-            <option>F1 Start</option><option>Pirate Flag</option><option>CPU Chart</option>
-          </select>
-        </div>
-      </div>
-      <div class="frow">
-        <div class="field"><label for="default_brightness">Brightness (%)</label>
-          <input type="number" required name="device.default_brightness" id="default_brightness" min="1" max="100">
-        </div>
-        <div class="field"><label for="default_colour">Colour</label>
-          <input type="color" name="device.default_colour" id="default_colour">
-        </div>
-      </div>
-      <div class="frow">
-        <div class="field"><label for="transition">Fade (ms)</label>
-          <input type="number" required name="device.transition_ms" id="transition" min="0" max="10000" step="100" aria-describedby="fade_help">
-        </div>
-      </div>
-      <p class="note" id="fade_help">Turning on and off, and changing the brightness or colour, fade over this long (0: at once).</p>
-    </div>
-    <div class="group">
-      <div class="sec">Web Password</div>
-      <div class="frow">
-        <div class="field"><label for="password">New Password</label>
-          <input type="password" name="web.password" id="password" maxlength="64" autocomplete="new-password" aria-describedby="password_help">
-        </div>
-      </div>
-      <p class="note" id="password_help">With one, this page and the API ask for it (any username). It's sent unencrypted,
-        so it keeps out other people on your network rather than a determined attacker.</p>
-      <p class="note" data-password-set="web.password" hidden>A password is set.
-        <button type="button" class="btn-full quiet" data-clear-password="web.password">Remove the password</button></p>
-    </div>
-    <div class="group">
-      <div class="sec">Diagnostics</div>
-      <div class="frow">
-        <div class="field"><label for="log_level">Log Detail</label>
-          <select name="device.log_level" id="log_level" data-number>
-            <option value="0">Warnings and errors</option><option value="1">And info</option><option value="2">And debug</option>
-          </select>
-        </div>
-      </div>
-      <p class="note">The log is in the Pi's journal: <code>journalctl -u applpi-app</code> over SSH.</p>
-    </div>
-    </div>
-    <button class="btn-full" type="submit">Save</button>
-    <p class="msg" role="status"></p>
-  </form>
-
-  <div class="sec">The Device</div>
-  <dl class="facts">
-    <dt>Name</dt><dd id="d_name">&mdash;</dd>
-    <dt>ApplPi OS</dt><dd id="d_os">&mdash;</dd>
-    <dt>Pi up for</dt><dd id="d_up">&mdash;</dd>
-    <dt>Drawing</dt><dd id="d_current">&mdash;</dd>
-  </dl>
-  <p class="note">The name is the Pi's, which SSH knows it by: it's set when the card is flashed.</p>
-  <div class="buttons">
-    <button class="btn-full quiet" data-restart data-msg="device_msg">Restart</button>
-    <button class="btn-full danger" data-reset data-msg="device_msg" data-confirm="Reset settings? Everything on this page goes back to its default (the web password too).">Reset Settings</button>
-  </div>
-  <p class="msg" id="device_msg" role="status"></p>
-</div>
-<footer>ApplPi Unicorn &middot; Earthstorm Software</footer>
+<footer id="footer"></footer>
 </div>
 <script src="/base.js"></script>
 <script>
-var el = Base.el, editing = null, fadeMs = 500, quickUntil = 0;
+var el = Base.el, quickUntil = 0, moving = 'none';
 for (var i = 0; i < 64; i++) el('grid').appendChild(document.createElement('span'));
 
 // After a change, the preview is checked every 100 ms until the HAT's fade is over, so it fades too
-function control(path, body) {
-  return Base.api(path, body).then(function () {
-    Base.say('control_msg', '');
-    quickUntil = Date.now() + fadeMs + 400;
-    refresh();
-  }).catch(function (e) { Base.say('control_msg', e.message); });
+function quick() {
+  var c = Base.config();
+  quickUntil = Date.now() + (c ? c.device.transition_ms : 500) + 400;
 }
-el('on').onclick = function () { control('/api/power/on', {}); };
-el('off').onclick = function () { control('/api/power/off', {}); };
+var light = Base.light({ speed: ['Rainbows', 'Pulse', 'Pirate Flag'], colour: ['Colour', 'Pulse'],
+  colours: { Pulse: '#d633ff' }, acted: quick });
+Base.schedule();
 
-// Sliders and pickers send as they move (at most every 150 ms), and aren't overwritten while in use
-function live(input, send, show) {
-  var timer = null;
-  input.addEventListener('input', function () {
-    editing = input;
-    if (show) show();
-    if (!timer) timer = setTimeout(function () { timer = null; send(); }, 150);
-  });
-  input.addEventListener('change', function () { editing = null; send(); });
-}
-live(el('brightness'), function () { control('/api/brightness', { brightness: Number(el('brightness').value) }); },
-  function () { el('brightness_value').textContent = el('brightness').value + '%'; });
-// The colour is Colour mode's, or Pulse's; the speed is the animations'
+// What each mode does, under the buttons
 var HELP = {
-  'Colour': '',
   'Rainbows': 'Rainbow colours moving across the grid.',
   'Pulse': 'A glow growing from the centre and shrinking back, in the colour below.',
   'F1 Start': 'As a Formula 1 start: the panels flash blue for 5 s, the five red lights come on a second apart, ' +
     'then after a moment they go out, and so does the light.',
   'Pirate Flag': 'The skull and crossbones, filling with red, over and over.',
-  'CPU Chart': "Another device's CPU use, a column a reading, newest on the left: set its topic on the Device tab (needs MQTT)."
+  'CPU Chart': "Another device's CPU use, a column a reading, newest on the left: its topic is on the Device tab (needs MQTT)."
 };
-var SPEED = ['Rainbows', 'Pulse', 'Pirate Flag'], shownMode = null;
-function showModeControls(mode) {
-  if (mode === shownMode) return;
-  shownMode = mode;
+// F1 Start runs again when chosen again (once it's over)
+el('f1_go').onclick = function () {
+  light.act('/api/mode', { mode: 'F1 Start' }).then(function () { return light.act('/api/power/on', {}); });
+};
+
+Base.onInfo(function (i) {
+  var l = i.light, mode = l.mode;
   el('mode_help').textContent = HELP[mode] || '';
   el('mode_help').hidden = !HELP[mode];
-  el('speed_row').hidden = SPEED.indexOf(mode) < 0;
-  el('colour_row').hidden = mode !== 'Colour' && mode !== 'Pulse';
-  el('kelvin_row').hidden = mode !== 'Colour';
   el('f1_go').hidden = mode !== 'F1 Start';
-}
-el('mode').addEventListener('change', function () {
-  showModeControls(el('mode').value);
-  control('/api/mode', { mode: el('mode').value });
+  el('white_row').hidden = false;
+  el('limit_note').hidden = !(i.hat && i.hat.limited);
+  el('device_name').value = i.name + '.local';
+  if (document.activeElement !== el('alerts')) el('alerts').setAttribute('aria-checked', l.alert.enabled ? 'true' : 'false');
+  showTopics();
 });
-// Choosing F1 Start again (once it's over) starts it again
-el('f1_go').onclick = function () {
-  control('/api/mode', { mode: 'F1 Start' }).then(function () { return control('/api/power/on', {}); });
-};
-live(el('speed'), function () { control('/api/mode', { mode: el('mode').value, parameters: { Speed: Number(el('speed').value) } }); },
-  function () { el('speed_value').textContent = el('speed').value; });
-live(el('colour'), function () {
-  var mode = el('mode').value === 'Pulse' ? 'Pulse' : 'Colour';
-  control('/api/mode', { mode: mode, parameters: { Colour: el('colour').value } });
-});
-live(el('kelvin'), function () { control('/api/mode', { mode: 'Colour', parameters: { Kelvin: Number(el('kelvin').value) } }); },
-  function () { el('kelvin_value').textContent = el('kelvin').value + ' K'; });
 
 // Alerts: the switch saves at once; the test shows one even with alerts off
-el('alerts_on').addEventListener('change', function () {
-  Base.api('/api/config', { alert: { enabled: el('alerts_on').checked } }).then(function () {
-    Base.say('alert_msg', el('alerts_on').checked ? 'Alerts on' : 'Alerts off', true);
-    refresh();
+el('alerts').addEventListener('click', function () {
+  var on = el('alerts').getAttribute('aria-checked') !== 'true';
+  el('alerts').setAttribute('aria-checked', on ? 'true' : 'false');
+  Base.api('/api/config', { alert: { enabled: on } }).then(function () {
+    Base.say('alert_msg', on ? 'Alerts on.' : 'Alerts off.', true);
+    Base.refresh();
   }).catch(function (e) { Base.say('alert_msg', e.message); });
 });
 el('alert_test').onclick = function () {
-  Base.api('/api/alert', { test: true }).then(function () {
-    Base.say('alert_msg', 'Alerting', true);
-    quickUntil = Date.now() + 2000;
-  }).catch(function (e) { Base.say('alert_msg', e.message); });
+  Base.api('/api/alert', { test: true }).then(function () { Base.say('alert_msg', 'Alerting…', true); })
+    .catch(function (e) { Base.say('alert_msg', e.message); });
 };
 el('alert_stop').onclick = function () {
-  Base.api('/api/alert/stop', {}).then(function () { Base.say('alert_msg', ''); quickUntil = Date.now() + 1000; });
+  Base.api('/api/alert/stop', {}).then(function () { Base.say('alert_msg', ''); quick(); });
 };
 
-function showLight(i) {
-  var l = i.light;
-  el('state').textContent = l.state ? 'On' : 'Off';
-  el('state').className = l.state ? 'badge on' : 'badge';
-  // The button for the state it's in is the highlighted one
-  el('on').className = l.state ? 'btn-full' : 'btn-full quiet';
-  el('off').className = l.state ? 'btn-full quiet' : 'btn-full';
-  el('on').setAttribute('aria-pressed', l.state);
-  el('off').setAttribute('aria-pressed', !l.state);
-  if (editing !== el('brightness')) {
-    el('brightness').value = l.brightness;
-    el('brightness_value').textContent = l.brightness + '%';
-  }
-  if (document.activeElement !== el('mode')) el('mode').value = l.mode;
-  showModeControls(l.mode);
-  if (editing !== el('speed')) {
-    el('speed').value = l.parameters.Speed || 5;
-    el('speed_value').textContent = el('speed').value;
-  }
-  if (editing !== el('colour')) {
-    if (l.mode === 'Colour' && l.parameters.Colour) el('colour').value = l.parameters.Colour;
-    if (l.mode === 'Pulse') el('colour').value = l.parameters.Colour || '#d633ff';
-  }
-  if (document.activeElement !== el('alerts_on')) el('alerts_on').checked = l.alert.enabled;
-  el('state').textContent = l.alert.active ? 'Alert' : l.state ? 'On' : 'Off';
-  if (editing !== el('kelvin')) {
-    var k = l.parameters.Kelvin;
-    el('kelvin_value').textContent = k ? k + ' K' : '';
-    if (k) el('kelvin').value = k;
-  }
-  el('limit_note').hidden = !(i.hat && i.hat.limited);
-  el('d_name').textContent = i.name + '.local';
-  el('d_os').textContent = i.os && i.os.version ? i.os.version + ' (slot ' + (i.os.slot || '?') + ')' : 'not ApplPi OS';
-  el('d_up').textContent = Base.duration(i.uptime_s);
-  el('d_current').textContent = i.hat ? 'about ' + i.hat.current_ma + ' mA' + (i.hat.connected ? '' : ' (no HAT: preview only)') : '';
+// The topics under the topic base, as they'll be once saved
+function showTopics() {
+  var i = Base.info(), p = el('topic_preview'), base = el('topic_base').value.trim();
+  p.textContent = '';
+  if (!base || !i) return;
+  base = base.split('{name}').join(i.name);
+  [['Commands', '/control'], ['State', '/state'], ['Alerts', '/alert'], ['Online status', '/status']].forEach(function (x) {
+    p.appendChild(Base.mk('div', { text: x[0] + ': ' }, [Base.mk('code', { text: base + x[1] })]));
+  });
 }
+el('topic_base').addEventListener('input', showTopics);
 
 // LEDs are far brighter than a screen: even dimmed they look nearly full. So the preview shows each colour at nearly
 // its full strength, its hue kept, and the brightness pulls it down only gently (a fourth-root curve): 61% shows at
@@ -434,23 +439,20 @@ function preview() {
     var cells = el('grid').children;
     p.pixels.forEach(function (c, n) { cells[n].style.setProperty('--c', lifted(c)); });
     // An alert starting or ending: the badge says so at once
-    if (p.moving !== moving && (p.moving === 'alert' || moving === 'alert')) refresh();
+    if (p.moving !== moving && (p.moving === 'alert' || moving === 'alert')) Base.refresh();
     moving = p.moving;
   }).catch(function () {});
 }
 
 // Every second; every 100 ms while a change fades or an alert flashes, and 200 ms while a mode moves
-var moving = 'none';
 (function previewLoop() {
   preview().then(function () {
-    var quick = Date.now() < quickUntil || moving === 'alert';
-    setTimeout(previewLoop, quick ? 100 : moving === 'mode' && !document.hidden ? 200 : 1000);
+    var fast = Date.now() < quickUntil || moving === 'alert';
+    setTimeout(previewLoop, fast ? 100 : moving === 'mode' && !document.hidden ? 200 : 1000);
   });
 })();
 
-function refresh() { Base.api('/api/info').then(showLight).catch(function () {}); }
-Base.api('/api/config').then(function (c) { fadeMs = c.device.transition_ms; }).catch(function () {});
-Base.start(showLight);
+Base.start();
 </script>
 </body>
 </html>

@@ -32,7 +32,8 @@ class Device:
         schemas = [BASE_SETTINGS, MQTT_SETTINGS, product.SETTINGS]
         if is_light:
             from base.light import LIGHT_SETTINGS
-            schemas.insert(1, LIGHT_SETTINGS)
+            from base.schedule import schedule_settings
+            schemas[1:1] = [LIGHT_SETTINGS, schedule_settings(('Colour',) + tuple(product.LIGHT_MODES))]
         self.settings = Settings(platform.state_path('config.json'), merge(*schemas))
         Log.level = self.settings.get('device', 'log_level')
         self.www = getattr(product, 'www', None) or beside(product.__file__, 'www')
@@ -98,7 +99,9 @@ class Device:
         port = getattr(self.platform, 'PORT', PORT)
         tasks = [asyncio.create_task(app.start_server(host=None if not MICROPYTHON else '0.0.0.0', port=port))]
         if self.light is not None:
+            from base import schedule
             tasks.append(asyncio.create_task(self.light.run()))
+            tasks.append(asyncio.create_task(schedule.run(self)))
         if self.mqtt.enabled:
             tasks.append(asyncio.create_task(self.mqtt.run()))
         if hasattr(self.product, 'tasks'):
