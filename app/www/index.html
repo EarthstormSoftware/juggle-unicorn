@@ -204,7 +204,7 @@ form:has(#mqtt_enabled:checked) .mqtt-off{display:none}
     <label class="check"><input type="checkbox" id="wifi_fallback_enabled"> If Wi-Fi doesn't connect, go into setup mode by itself</label>
     <div class="frow">
       <div class="field"><label for="wifi_fallback_after">After (minutes without a network)</label>
-        <input type="number" id="wifi_fallback_after" min="1" max="60" step="1">
+        <input type="number" id="wifi_fallback_after" min="1" max="1440" step="1">
       </div>
       <div class="field"><label for="wifi_fallback_for">For (minutes, then try Wi-Fi again)</label>
         <input type="number" id="wifi_fallback_for" min="5" max="120" step="1">
