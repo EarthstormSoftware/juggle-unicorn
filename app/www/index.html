@@ -194,16 +194,40 @@ form:has(#mqtt_enabled:checked) .mqtt-off{display:none}
   <p class="note" id="update_note"></p>
 
   <div data-os-setup hidden>
-    <div class="sec">Name and Wi-Fi</div>
-    <p class="note">The Pi's name and Wi-Fi network are changed in its setup mode: it restarts with the ApplPi-SETUP
-      Wi-Fi network and a setup page, for as long as set below, then carries on with its settings unless new ones are
-      saved there.</p>
-    <div class="buttons">
-      <button type="button" class="btn-full quiet" data-setup-mode data-msg="wifi_msg" data-confirm="Restart the Pi into setup mode? This page goes away until it's back.">Rename or change Wi-Fi…</button>
+    <div class="sec">Wi-Fi</div>
+    <div data-wifi-change hidden>
+      <p class="note">The Pi is set to <b id="wifi_current">&hellip;</b>. A new network is used after a restart, on
+        trial: if it can't connect within 5 minutes, the Pi goes back to this one.</p>
+      <div class="frow">
+        <div class="field"><label for="wifi_network">Network</label>
+          <select id="wifi_network"><option value="">Scan to list them</option></select>
+        </div>
+        <div class="field"><label for="wifi_network_other">Or type its name</label>
+          <input type="text" id="wifi_network_other" maxlength="32" placeholder="a hidden network" autocomplete="off" spellcheck="false" autocapitalize="off">
+        </div>
+      </div>
+      <div class="frow">
+        <div class="field"><label for="wifi_password">Password</label>
+          <input type="password" id="wifi_password" maxlength="63" placeholder="8-63 characters" autocomplete="new-password">
+        </div>
+      </div>
+      <div class="buttons">
+        <button type="button" class="btn-full quiet" id="wifi_scan">Scan</button>
+        <button type="button" class="btn-full" id="wifi_change">Change Wi-Fi</button>
+      </div>
+      <p class="msg" id="wifi_change_msg" role="status" aria-live="polite"></p>
     </div>
+    <div class="sec">Name and Setup Mode</div>
+    <p class="note">The Pi's name, and its Wi-Fi when it can't reach this page, are changed in its setup mode: it
+      restarts with the ApplPi-SETUP Wi-Fi network and a setup page, for as long as set below, then carries on with its
+      settings unless new ones are saved there.</p>
+    <div class="buttons">
+      <button type="button" class="btn-full quiet" data-setup-mode data-msg="wifi_msg" data-confirm="Restart the Pi into setup mode? This page goes away until it's back.">Rename (setup mode)…</button>
+    </div>
+    <div class="sec">Wi-Fi Fallback</div>
     <label class="check"><input type="checkbox" id="wifi_fallback_enabled"> If Wi-Fi doesn't connect, go into setup mode by itself</label>
     <div class="frow">
-      <div class="field"><label for="wifi_fallback_after">After (minutes without a network)</label>
+      <div class="field"><label for="wifi_fallback_after">After (minutes without a network, up to 1440: a day)</label>
         <input type="number" id="wifi_fallback_after" min="1" max="1440" step="1">
       </div>
       <div class="field"><label for="wifi_fallback_for">For (minutes, then try Wi-Fi again)</label>
