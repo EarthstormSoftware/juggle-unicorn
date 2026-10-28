@@ -85,7 +85,8 @@ are set on the Schedule tab (ApplPi OS v0.4's app requests).
 README, tests, the first release, and a Pi running it.
 v0.1.0 (2026-10-27), on App Base v0.1.0. v0.2.0 (2026-10-27), on App Base v0.2.0: deploys over Wi-Fi, the
 Pi's clock and restarting the Pi from the page, and systemd's watchdog. It needs ApplPi OS v0.4 (`rpi_ws281x`,
-`"pwm"` and the app requests). The repos stay private until the app contract is settled, near ApplPi OS v1.
+`"pwm"` and the app requests). v0.3.0 (2026-10-28), on App Base v0.3.0: the Pi's name, the Wi-Fi fallback
+and a factory reset on the Device tab, with ApplPi OS v0.5's setup mode. The repos stay private until the app contract is settled, near ApplPi OS v1.
 
 ### 6. Status and alerts
 

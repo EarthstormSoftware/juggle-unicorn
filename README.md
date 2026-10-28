@@ -49,7 +49,7 @@ The Pi tries the new version and goes back to the old one if it doesn't keep run
 | Tab | Has |
 |---|---|
 | Control | The preview, power, brightness, the modes, speed, colour and white |
-| Device | The HAT's rotation and power limit, what it does at power-up, CPU Chart's topic, the web password, the log level, restart, restarting the Pi and reset |
+| Device | The HAT's rotation and power limit, what it does at power-up, CPU Chart's topic, the web password, the log level, restart, restarting the Pi and reset; on ApplPi OS v0.5 or later, the Pi's name, the Wi-Fi fallback and a factory reset |
 | MQTT | The broker, the topic base, the group, and Home Assistant discovery |
 | Schedule | The location (for sunrise and sunset), the events, and the Pi's clock: its time zone and time server |
 | Alert | The Alerts switch, Test and Stop, the alert's colour, timing and brightness, and the topic to watch |
@@ -72,6 +72,8 @@ As PlasmaStick's, from App Base:
 | `GET`, `POST /api/clock` | The Pi's time zone and time server |
 | `GET`, `POST /api/update` | How the last update went; a new version of the app, as a tar (what `deploy.ps1 -WiFi` sends) |
 | `POST /api/reboot` | Restarts the Pi |
+| `GET`, `POST /api/wifi` | The Wi-Fi fallback: setup mode when Wi-Fi doesn't connect (ApplPi OS v0.5) |
+| `POST /api/setup-mode`, `/api/factory-reset` | Restarts the Pi in setup mode, to rename it; forgets the Pi's settings and starts setup mode (both `{"confirm": true}`) |
 
 POSTs from other sites' pages are refused, and with a web password set every request needs it.
 
