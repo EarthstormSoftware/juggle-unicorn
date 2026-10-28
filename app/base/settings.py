@@ -5,6 +5,10 @@ A product describes its settings as sections of Setting, next to the base's own 
 a check, whether changing it needs a restart, and whether it's a secret (stored as given by `store`, such as a hash,
 and never shown: the view says only whether it's set). The file keeps only what's known: anything else in it is
 dropped, and anything missing has its default.
+
+A platform whose file has its own layout (a Pico's, as the firmware before the base wrote it) gives a codec:
+load(stored) turns the file into {section: {key: value}}, and dump(values) turns that back. A secret kept in a form that
+has to be undone to use it (encrypted, not hashed) has a reveal, used through Settings.reveal().
 """
 from base.compat import json, write_atomically
 from base.log import Log
@@ -13,12 +17,13 @@ TAG = 'SETTINGS'
 
 
 class Setting:
-    def __init__(self, default, check=None, restart=False, secret=False, store=None):
+    def __init__(self, default, check=None, restart=False, secret=False, store=None, reveal=None):
         self.default = default
         self.check = check  # check(value): why it can't be used, or None
         self.restart = restart
         self.secret = secret
         self.store = store  # store(value): what's kept (a secret's hash); None (JSON null) clears a secret
+        self.reveal = reveal  # reveal(kept): the secret itself, from what's kept
 
 
 def is_int(low, high):
@@ -78,13 +83,18 @@ def merge(*schemas):
 
 
 class Settings:
-    def __init__(self, path, schema):
+    def __init__(self, path, schema, codec=None):
         self.path = path
         self.schema = schema
+        self.codec = codec
         self.values = self._defaults()
         try:
             with open(path) as f:
                 stored = json.loads(f.read())
+            if not isinstance(stored, dict):
+                raise ValueError('not a JSON object')
+            if codec is not None:
+                stored = codec.load(stored)
             for section, settings in schema.items():
                 for key, setting in settings.items():
                     value = stored.get(section, {}).get(key)
@@ -106,6 +116,12 @@ class Settings:
 
     def get(self, section, key):
         return self.values[section][key]
+
+    def reveal(self, section, key):
+        """A secret as it's used (decrypted), where it's kept in another form; otherwise as get()."""
+        value = self.values[section][key]
+        reveal = self.schema[section][key].reveal
+        return reveal(value) if reveal is not None and value else value
 
     def view(self):
         """The settings for the page and GET /api/config: a secret only as whether it's set (<key>_set)."""
@@ -146,7 +162,7 @@ class Settings:
             values = {section: dict(settings) for section, settings in self.values.items()}
             for section, key in changed:
                 values[section][key] = new[(section, key)]
-            write_atomically(self.path, json.dumps(values))
+            write_atomically(self.path, self._text(values))
             self.values = values
         return None, changed
 
@@ -162,4 +178,7 @@ class Settings:
         self.save()
 
     def save(self):
-        write_atomically(self.path, json.dumps(self.values))
+        write_atomically(self.path, self._text(self.values))
+
+    def _text(self, values):
+        return json.dumps(self.codec.dump(values) if self.codec is not None else values)

@@ -105,13 +105,14 @@ def os_requests():
     return os.path.exists(APP_REQUEST)
 
 
-def _request(*args):
-    """Asks the OS (app-request); its answer, or RequestError with why not."""
+def _request(*args, given=None):
+    """Asks the OS (app-request), with given on its stdin (a password, kept out of the process list); its answer, or
+    RequestError with why not."""
     if not os_requests():
         raise RequestError('Only on ApplPi OS v0.4 or later.')
     command = [APP_REQUEST, *args] if os.geteuid() == 0 else ['sudo', '-n', APP_REQUEST, *args]
     try:
-        done = subprocess.run(command, capture_output=True, text=True, timeout=60)
+        done = subprocess.run(command, capture_output=True, text=True, timeout=60, input=given)
     except (OSError, subprocess.SubprocessError) as e:
         raise RequestError(str(e))
     if done.returncode != 0:
@@ -180,6 +181,41 @@ def os_setup():
     return _setup
 
 
+_wifi = None
+
+
+def os_wifi():
+    """Whether the OS takes a new Wi-Fi network from the app (app-request knows networks), found once."""
+    global _wifi
+    if _wifi is None:
+        try:
+            with open(APP_REQUEST, encoding='utf-8') as f:
+                _wifi = 'app-request networks' in f.read()
+        except OSError:
+            _wifi = False
+    return _wifi
+
+
+def wifi_ssid():
+    """The Wi-Fi network the Pi is set to (None on Ethernet)."""
+    return clock_settings().get('wifi_ssid')
+
+
+def wifi_networks():
+    """The networks in range, strongest first."""
+    if not os_wifi():
+        raise RequestError("Only on an ApplPi OS that takes Wi-Fi changes from the app.")
+    return json.loads(_request('networks'))
+
+
+def change_wifi(ssid, password):
+    """A new Wi-Fi network, from the Pi's next start, on trial: the OS goes back to the network before if it doesn't
+    connect within 5 minutes."""
+    if not os_wifi():
+        raise RequestError("Only on an ApplPi OS that takes Wi-Fi changes from the app.")
+    _request('wifi', ssid, given=password + '\n')
+
+
 def _need_setup():
     if not os_setup():
         raise RequestError('Only on ApplPi OS with setup mode (the release after v0.4).')
@@ -193,7 +229,7 @@ def wifi_fallback():
 
 
 def set_wifi_fallback(enabled, after_minutes, for_minutes):
-    """Used from the Pi's next start. The OS checks the limits (1-60 and 5-120 minutes)."""
+    """Used from the Pi's next start. The OS checks the limits (1-1440 and 5-120 minutes)."""
     _need_setup()
     _request('wifi-fallback', 'on' if enabled else 'off', str(int(after_minutes)), str(int(for_minutes)))
 
@@ -231,6 +267,12 @@ async def watchdog():
     while True:
         tell(b'WATCHDOG=1')
         await asyncio.sleep(WATCHDOG_EVERY_S)
+
+
+def routes(app, device):
+    """What the app asks of the OS, as routes (base.piweb)."""
+    from base import piweb
+    piweb.routes(app, device)
 
 
 def mqtt_client(**options):

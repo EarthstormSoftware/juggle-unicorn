@@ -234,8 +234,11 @@ var Base = (function () {
           if (!confirm(b.dataset.confirm)) return;
           api(a[1], { confirm: true }).then(function () {
             restarting = true;
-            say(b.dataset.msg, 'Restarting into setup mode. Join the ApplPi-SETUP Wi-Fi and open http://192.168.4.1 ' +
-              '(on Ethernet: https://' + (info ? info.name : '<name>') + '.local/), in about a minute.', true);
+            // A Pico gives its own hotspot's name (and has no Ethernet)
+            say(b.dataset.msg, info && info.setup_ssid
+              ? 'Restarting into setup mode. Join the ' + info.setup_ssid + ' Wi-Fi and open http://192.168.4.1.'
+              : 'Restarting into setup mode. Join the ApplPi-SETUP Wi-Fi and open http://192.168.4.1 ' +
+                '(on Ethernet: https://' + (info ? info.name : '<name>') + '.local/), in about a minute.', true);
           }).catch(function (e) { say(b.dataset.msg, 'Not done: ' + e.message); });
         });
       });
@@ -280,8 +283,11 @@ var Base = (function () {
     // What the OS does for an ApplPi app: shown where it takes the app's requests
     var requests = !!(i.os && i.os.requests);
     document.querySelectorAll('[data-os-requests]').forEach(function (n) { n.hidden = !requests; });
-    var setup = !!(i.os && i.os.setup);
+    // Setup mode: the OS's on a Pi (i.os.setup), the device's own on a Pico (i.setup)
+    var setup = !!(i.setup || (i.os && i.os.setup));
     document.querySelectorAll('[data-os-setup]').forEach(function (n) { n.hidden = !setup; });
+    // A name the device changes itself (a Pico's), rather than the OS's
+    document.querySelectorAll('[data-name-editable]').forEach(function (n) { n.hidden = !i.name_editable; });
     if (el('update_note')) {
       var u = i.update;
       el('update_note').textContent = !u ? '' : (u.success ? '' : 'The last update failed: ') + u.message +
@@ -468,9 +474,11 @@ var Base = (function () {
     return { act: act, expect: expect };
   }
 
-  // A light's schedule, as PlasmaStick's: the events (schedule.events, up to 8), the location for sunrise and sunset,
-  // and the clock, which on a Pi is the Pi's own
-  function schedule() {
+  // The schedule, as PlasmaStick's: the events (schedule.events, up to 8), the location for sunrise and sunset, and
+  // the clock, which on a Pi is the Pi's own. labels: what on and off are called (a light's: Turn on, Turn off); a
+  // device that isn't a light has no mode or brightness in its events
+  function schedule(labels) {
+    labels = labels || ['Turn on', 'Turn off'];
     var DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     var form = el('events').closest('form');
 
@@ -498,12 +506,13 @@ var Base = (function () {
       }
       when.addEventListener('change', showWhen);
       var action = options(mk('select', { 'aria-label': 'Action', 'data-k': 'action' }),
-        [['on', 'Turn on'], ['off', 'Turn off']], ev.action);
-      var modes = [['', 'Same mode']].concat((info ? info.light.modes : []).map(function (m) { return [m, m]; }));
+        [['on', labels[0]], ['off', labels[1]]], ev.action);
+      var lightless = !(info && info.light);
+      var modes = [['', 'Same mode']].concat((lightless ? [] : info.light.modes).map(function (m) { return [m, m]; }));
       var mode = options(mk('select', { 'aria-label': 'Mode', 'data-k': 'mode' }), modes, ev.mode || '');
       var bright = mk('input', { type: 'number', min: 1, max: 100, placeholder: '%', value: ev.brightness || '',
         'aria-label': 'Brightness (blank: unchanged)', 'data-k': 'brightness' });
-      function showAction() { mode.hidden = bright.hidden = action.value === 'off'; }
+      function showAction() { mode.hidden = bright.hidden = lightless || action.value === 'off'; }
       action.addEventListener('change', showAction);
       var row = mk('div', { className: 'event' }, [days, when, time, offset, offsetLabel, action, mode, bright]);
       row.appendChild(mk('button', { type: 'button', className: 'reset remove', text: 'Remove', onclick: function () {
@@ -609,22 +618,71 @@ var Base = (function () {
     if (!el('wifi_save')) return;
     var loaded = false;
     infoListeners.push(function (i) {
-      if (loaded || !(i.os && i.os.setup)) return;
+      if (loaded || !(i.setup || (i.os && i.os.setup))) return;
       loaded = true;
       api('/api/wifi').then(function (w) {
         el('wifi_fallback_enabled').checked = w.fallback.enabled;
         el('wifi_fallback_after').value = w.fallback.after_minutes;
         el('wifi_fallback_for').value = w.fallback.for_minutes;
+        // Changing the network here, where the device can (a Pico): otherwise it's setup mode's
+        document.querySelectorAll('[data-wifi-change]').forEach(function (n) { n.hidden = !w.change; });
+        document.querySelectorAll('[data-wifi-setup]').forEach(function (n) { n.hidden = !!w.change; });
+        if (w.change && el('wifi_current')) el('wifi_current').textContent = w.ssid || 'none';
       }).catch(function (e) { say('wifi_msg', 'Could not load the Wi-Fi settings: ' + e.message); });
     });
+    // The network: chosen from a scan (wifi_scan fills wifi_network) or typed (wifi_network_other, for a hidden one),
+    // with wifi_password, and changed by wifi_change: the device restarts onto it, and goes back to the network it
+    // had if the new one doesn't connect within a few minutes
+    if (el('wifi_change')) {
+      el('wifi_scan').addEventListener('click', function () {
+        say('wifi_change_msg', 'Looking for networks…', true);
+        api('/api/wifi/networks').then(function (r) {
+          var select = el('wifi_network');
+          select.textContent = '';
+          r.networks.forEach(function (n) { select.appendChild(mk('option', { value: n, text: n })); });
+          say('wifi_change_msg', r.networks.length + ' network(s) found.', true);
+        }).catch(function (e) { say('wifi_change_msg', 'Could not scan: ' + e.message); });
+      });
+      el('wifi_change').addEventListener('click', function () {
+        var ssid = el('wifi_network_other').value.trim() || el('wifi_network').value;
+        if (!ssid) { say('wifi_change_msg', 'Choose a network (Scan), or type its name.'); return; }
+        if (!confirm('Change to ' + ssid + '? The device restarts onto it. If it can’t connect within 5 minutes, ' +
+          'it goes back to the network it has now.')) return;
+        say('wifi_change_msg', 'Saving…', true);
+        api('/api/wifi', { network: { ssid: ssid, password: el('wifi_password').value } }).then(function () {
+          el('wifi_password').value = '';
+          say('wifi_change_msg', 'Saved: restarting onto ' + ssid + '. If it’s on another network, this page won’t ' +
+            'come back here; if it can’t connect, the device goes back to the network it had.', true);
+          waitForRestart(el('wifi_change_msg'));
+        }).catch(function (e) { say('wifi_change_msg', 'Not changed: ' + e.message); });
+      });
+    }
     el('wifi_save').addEventListener('click', function () {
       say('wifi_msg', 'Saving…', true);
       api('/api/wifi', { fallback: {
         enabled: el('wifi_fallback_enabled').checked,
         after_minutes: parseInt(el('wifi_fallback_after').value, 10),
         for_minutes: parseInt(el('wifi_fallback_for').value, 10)
-      } }).then(function () { say('wifi_msg', 'Saved: from the Pi’s next start.', true); })
+      } }).then(function () { say('wifi_msg', 'Saved: from the next start.', true); })
         .catch(function (e) { say('wifi_msg', 'Not saved: ' + e.message); });
+    });
+  }
+
+  // Renaming a device whose name is its own (a Pico's): the field device_name, saved by rename_save (POST /api/name),
+  // from the next start
+  function rename() {
+    if (!el('rename_save')) return;
+    var filled = false;
+    infoListeners.push(function (i) {
+      if (filled || !i.name_editable) return;
+      filled = true;
+      el('device_name').value = i.name;
+    });
+    el('rename_save').addEventListener('click', function () {
+      say('rename_msg', 'Saving…', true);
+      api('/api/name', { name: el('device_name').value.trim() }).then(function () {
+        say('rename_msg', 'Saved: restart for it to be used (the page is then at the new name).', true);
+      }).catch(function (e) { say('rename_msg', 'Not saved: ' + e.message); });
     });
   }
 
@@ -633,6 +691,7 @@ var Base = (function () {
     settingsForms();
     actions();
     wifi();
+    rename();
     setInterval(function () { if (!document.hidden) refresh(); }, 3000);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) refresh(); });
     // The settings load after the first /api/info, which brings the modes the Default Mode list needs

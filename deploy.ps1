@@ -19,8 +19,8 @@ $target = "applpi@$Name.local"
 $url = "http://$Name.local"
 
 try {
-    # Windows' own tar; the Pi makes the files root's and readable by the app
-    & "$env:SystemRoot\System32\tar.exe" -c -f $archive -C $app --exclude __pycache__ --exclude state .
+    # Windows' own tar; the Pi makes the files root's and readable by the app. App Base's Pico code stays behind
+    & "$env:SystemRoot\System32\tar.exe" -c -f $archive -C $app --exclude __pycache__ --exclude state --exclude ./base/pico .
     if ($LASTEXITCODE -ne 0) { throw 'tar failed' }
     $version = (Get-Content (Join-Path $app 'app.json') -Raw | ConvertFrom-Json).version
 
