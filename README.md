@@ -22,8 +22,9 @@ kept as a copy in `app/base/`.
 ## What it needs
 
 - A Raspberry Pi with a 40-pin header (developed on a Pi 2) and the original Unicorn HAT (not the HD or Mini).
-- **ApplPi OS v0.4 or later**: that's the first with the `rpi_ws281x` library in the image, and `"pwm": true` in
-  `app.json`, with which the OS turns off the onboard audio while the app runs (both use the PWM hardware).
+- **ApplPi OS from the release after v0.6.0**: the first that knows `applpi` in `app.json` (ApplPi 1.0, the app
+  contract). The library it needs, `rpi_ws281x`, and `"pwm": true` in `app.json`, with which the OS turns off the
+  onboard audio while the app runs (both use the PWM hardware), came in v0.4.
 
 ## Deploying it
 
