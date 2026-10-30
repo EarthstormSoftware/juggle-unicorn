@@ -2,3 +2,4 @@ __pycache__/
 app/state/
 .state-test/
 .pytest_cache/
+state/

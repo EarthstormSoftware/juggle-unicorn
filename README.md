@@ -104,7 +104,7 @@ the preview stands in for:
 $env:PORT = 8080; py app\main.py
 ```
 
-Its settings are then in `app\state\`.
+Its settings are then in `state\`, in the folder it's run from.
 
 `app\base\` is a copy of App Base, which the tests check is unchanged: a fix goes into App Base, then
 `..\app-base\update-base.ps1 -Product app` copies it in (`-Tag vX.Y.Z` for a release of App Base).
