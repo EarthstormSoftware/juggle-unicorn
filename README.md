@@ -31,16 +31,16 @@ kept as a copy in `app/base/`.
 On Windows, with the Pi set up by `juggle flash` (so SSH works with your key):
 
 ```powershell
-.\deploy.ps1 <name>
+.\deploy.ps1 [name]
 ```
 
-It copies the app to the Pi, which replaces the app it had, starts this one and says whether it's running. Then it's
-at `http://<name>.local`. Its settings are kept through deploys and OS updates.
+The name defaults to `jugglepi`. It copies the app to the Pi, which replaces the app it had, starts this one and says
+whether it's running. Then it's at `http://<name>.local`. Its settings are kept through deploys and OS updates.
 
 Once it's running, a new version can also go over Wi-Fi, to the app itself, with no SSH key:
 
 ```powershell
-.\deploy.ps1 <name> -WiFi [-Password <the web password>]
+.\deploy.ps1 [name] -WiFi [-Password <the web password>]
 ```
 
 The Pi tries the new version and goes back to the old one if it doesn't keep running.

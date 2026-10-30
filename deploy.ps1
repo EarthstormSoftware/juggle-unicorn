@@ -1,12 +1,11 @@
-# Deploys Juggle Unicorn to a Pi running Juggle OS: .\deploy.ps1 <name> [-WiFi [-Password <p>]]
+# Deploys Juggle Unicorn to a Pi running Juggle OS: .\deploy.ps1 [name] (default: jugglepi) [-WiFi [-Password <p>]]
 # Over SSH (the Pi set up by juggle, with your key), the Pi replaces the app it had with this one and starts it, then
 # says whether it's running. Its settings stay (they're in the app's state folder), unless the Pi had a different app.
 # -WiFi sends it to the app itself instead (POST /api/update, as a Pico's deploy.ps1 -WiFi does; Juggle OS v0.4 or
 # later): no SSH key needed, but it must be this app already running. The Pi tries the new version and goes back to
 # the old one if it doesn't keep running. -Password: the app's web password, if it has one.
 param(
-    [Parameter(Mandatory)]
-    [string]$Name,
+    [string]$Name = 'jugglepi',
     [switch]$WiFi,
     [string]$Password
 )
