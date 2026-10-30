@@ -1,11 +1,12 @@
-# Deploys ApplPi Unicorn to a Pi running ApplPi OS: .\deploy.ps1 [name] (default: jugglepi) [-WiFi [-Password <p>]]
-# Over SSH (the Pi set up by applpi, with your key), the Pi replaces the app it had with this one and starts it, then
+# Deploys Juggle Unicorn to a Pi running Juggle OS: .\deploy.ps1 <name> [-WiFi [-Password <p>]]
+# Over SSH (the Pi set up by juggle, with your key), the Pi replaces the app it had with this one and starts it, then
 # says whether it's running. Its settings stay (they're in the app's state folder), unless the Pi had a different app.
-# -WiFi sends it to the app itself instead (POST /api/update, as a Pico's deploy.ps1 -WiFi does; ApplPi OS v0.4 or
+# -WiFi sends it to the app itself instead (POST /api/update, as a Pico's deploy.ps1 -WiFi does; Juggle OS v0.4 or
 # later): no SSH key needed, but it must be this app already running. The Pi tries the new version and goes back to
 # the old one if it doesn't keep running. -Password: the app's web password, if it has one.
 param(
-    [string]$Name = 'jugglepi',
+    [Parameter(Mandatory)]
+    [string]$Name,
     [switch]$WiFi,
     [string]$Password
 )
@@ -14,8 +15,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $app = Join-Path $PSScriptRoot 'app'
-$archive = Join-Path ([IO.Path]::GetTempPath()) "applpi-app-$PID.tar"
-$target = "applpi@$Name.local"
+$archive = Join-Path ([IO.Path]::GetTempPath()) "juggle-app-$PID.tar"
+$target = "juggle@$Name.local"
 $url = "http://$Name.local"
 
 try {
@@ -28,7 +29,7 @@ try {
         Write-Host "Copying the app to $Name"
         scp -q $archive "${target}:/tmp/app.tar"
         if ($LASTEXITCODE -ne 0) { throw "Couldn't copy the app to $Name" }
-        ssh $target 'sudo /usr/lib/applpi/app install /tmp/app.tar; status=$?; rm -f /tmp/app.tar; exit $status'
+        ssh $target 'sudo /usr/lib/juggle/app install /tmp/app.tar; status=$?; rm -f /tmp/app.tar; exit $status'
         if ($LASTEXITCODE -ne 0) { throw "The app didn't install on $Name" }
         Write-Host $url
         return
@@ -57,7 +58,7 @@ try {
         try { $result = (Invoke-RestMethod "$url/api/update" -Headers $headers -TimeoutSec 10).result } catch { $result = $null }
         $done = $result -and (-not $before -or $result.time -ne $before.time)
     } until ($done -or (Get-Date) -gt $deadline)
-    if (-not $done) { throw "No answer from $Name about the update: see its page, or journalctl -u applpi-app-update" }
+    if (-not $done) { throw "No answer from $Name about the update: see its page, or journalctl -u juggle-app-update" }
     if (-not $result.success) { throw $result.message }
     Write-Host "$($result.message) $url"
 }

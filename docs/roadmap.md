@@ -1,14 +1,14 @@
 # Roadmap
 
-ApplPi Unicorn is an ApplPi OS app for the original Pimoroni Unicorn HAT: 64 WS2812 LEDs in an 8×8 grid on GPIO 18.
+Juggle Unicorn is a Juggle OS app for the original Pimoroni Unicorn HAT: 64 WS2812 LEDs in an 8×8 grid on GPIO 18.
 It's a light, controlled like PlasmaStick Controller (the web page, the JSON API, MQTT and Home Assistant), with
 modes from the 2015-2022 `uhcontrol.py` script it replaces, which took `{"opcode": ...}` commands over MQTT (nothing
 sends those any more, so they aren't kept).
 
 ## Design
 
-- **ApplPi OS app**, one per Pi: `/data/app`, `app.json` with `"root": true` (`rpi_ws281x` needs `/dev/mem`) and
-  `"pwm": true` (ApplPi OS unloads the onboard audio's driver while it runs, as both use the PWM hardware), its
+- **Juggle OS app**, one per Pi: `/data/app`, `app.json` with `"root": true` (`rpi_ws281x` needs `/dev/mem`) and
+  `"pwm": true` (Juggle OS unloads the onboard audio's driver while it runs, as both use the PWM hardware), its
   settings in `/data/app-state`, deployed with `deploy.ps1`. `rpi_ws281x` is in the image (v0.4).
 - **Built on App Base** (its first user): the web server, settings, MQTT, Home Assistant discovery and the light
   model, vendored in `src/base/`.
@@ -78,15 +78,15 @@ Rainbows, Pulse, F1 Start, Pirate Flag and CPU Chart, and alerts. Checked on the
 A Schedule tab, and the group setting on the MQTT tab, from App Base. Checked with a PlasmaStick in the same group.
 The page matches PlasmaStick's (its tabs, power switch, mode buttons and colour row, from App Base), with the
 preview above the controls and an Alert tab. The schedule uses the Pi's clock, whose time zone and time server
-are set on the Schedule tab (ApplPi OS v0.4's app requests).
+are set on the Schedule tab (Juggle OS v0.4's app requests).
 
 ### 5. Finish
 
 README, tests, the first release, and a Pi running it.
 v0.1.0 (2026-10-27), on App Base v0.1.0. v0.2.0 (2026-10-27), on App Base v0.2.0: deploys over Wi-Fi, the
-Pi's clock and restarting the Pi from the page, and systemd's watchdog. It needs ApplPi OS v0.4 (`rpi_ws281x`,
+Pi's clock and restarting the Pi from the page, and systemd's watchdog. It needs Juggle OS v0.4 (`rpi_ws281x`,
 `"pwm"` and the app requests). v0.3.0 (2026-10-28), on App Base v0.3.0: the Pi's name, the Wi-Fi fallback
-and a factory reset on the Device tab, with ApplPi OS v0.5's setup mode. The repos stay private until the app contract is settled, near ApplPi OS v1.
+and a factory reset on the Device tab, with Juggle OS v0.5's setup mode. The repos stay private until the app contract is settled, near Juggle OS v1.
 
 ### 6. Status and alerts
 

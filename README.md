@@ -1,7 +1,7 @@
-# ApplPi Unicorn
+# Juggle Unicorn
 
 The original [Pimoroni Unicorn HAT](https://shop.pimoroni.com/products/unicorn-hat) (64 RGB LEDs in an 8×8 grid) as
-a light, on a Raspberry Pi running [ApplPi OS](https://github.com/EarthstormSoftware/applpi-os). It's controlled
+a light, on a Raspberry Pi running [Juggle OS](https://github.com/EarthstormSoftware/juggle-os). It's controlled
 like PlasmaStick Controller: the same web page, JSON API, MQTT topics and Home Assistant light, and it joins
 PlasmaStick groups.
 
@@ -22,13 +22,13 @@ kept as a copy in `app/base/`.
 ## What it needs
 
 - A Raspberry Pi with a 40-pin header (developed on a Pi 2) and the original Unicorn HAT (not the HD or Mini).
-- **ApplPi OS from the release after v0.6.0**: the first that knows `applpi` in `app.json` (ApplPi 1.0, the app
+- **Juggle OS from the release after v0.6.0**: the first that knows `juggle` in `app.json` (Juggle 1.0, the app
   contract). The library it needs, `rpi_ws281x`, and `"pwm": true` in `app.json`, with which the OS turns off the
   onboard audio while the app runs (both use the PWM hardware), came in v0.4.
 
 ## Deploying it
 
-On Windows, with the Pi set up by `applpi flash` (so SSH works with your key):
+On Windows, with the Pi set up by `juggle flash` (so SSH works with your key):
 
 ```powershell
 .\deploy.ps1 <name>
@@ -50,7 +50,7 @@ The Pi tries the new version and goes back to the old one if it doesn't keep run
 | Tab | Has |
 |---|---|
 | Control | The preview, power, brightness, the modes, speed, colour and white |
-| Device | The HAT's rotation and power limit, what it does at power-up, CPU Chart's topic, the web password, the log level, restart, restarting the Pi and reset; on ApplPi OS v0.5 or later, the Pi's name, the Wi-Fi fallback and a factory reset |
+| Device | The HAT's rotation and power limit, what it does at power-up, CPU Chart's topic, the web password, the log level, restart, restarting the Pi and reset; on Juggle OS v0.5 or later, the Pi's name, the Wi-Fi fallback and a factory reset |
 | MQTT | The broker, the topic base, the group, and Home Assistant discovery |
 | Schedule | The location (for sunrise and sunset), the events, and the Pi's clock: its time zone and time server |
 | Alert | The Alerts switch, Test and Stop, the alert's colour, timing and brightness, and the topic to watch |
@@ -73,7 +73,7 @@ As PlasmaStick's, from App Base:
 | `GET`, `POST /api/clock` | The Pi's time zone and time server |
 | `GET`, `POST /api/update` | How the last update went; a new version of the app, as a tar (what `deploy.ps1 -WiFi` sends) |
 | `POST /api/reboot` | Restarts the Pi |
-| `GET`, `POST /api/wifi` | The Wi-Fi fallback: setup mode when Wi-Fi doesn't connect (ApplPi OS v0.5) |
+| `GET`, `POST /api/wifi` | The Wi-Fi fallback: setup mode when Wi-Fi doesn't connect (Juggle OS v0.5) |
 | `POST /api/setup-mode`, `/api/factory-reset` | Restarts the Pi in setup mode, to rename it; forgets the Pi's settings and starts setup mode (both `{"confirm": true}`) |
 
 POSTs from other sites' pages are refused, and with a web password set every request needs it.

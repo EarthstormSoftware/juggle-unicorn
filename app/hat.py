@@ -1,5 +1,5 @@
 """
-The Unicorn HAT: 64 WS2812 LEDs in an 8×8 grid on GPIO 18, driven by rpi_ws281x (in ApplPi OS's image; it needs root
+The Unicorn HAT: 64 WS2812 LEDs in an 8×8 grid on GPIO 18, driven by rpi_ws281x (in Juggle OS's image; it needs root
 and the PWM hardware, hence "root" and "pwm" in app.json).
 
 The light's frames are in reading order: index y * 8 + x, with (0, 0) the top left. With rotation 0 that's as seen

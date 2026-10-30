@@ -1,4 +1,4 @@
-"""ApplPi Unicorn: the Pimoroni Unicorn HAT as a light, on App Base. See docs/roadmap.md."""
+"""Juggle Unicorn: the Pimoroni Unicorn HAT as a light, on App Base. See docs/roadmap.md."""
 import json
 from pathlib import Path
 

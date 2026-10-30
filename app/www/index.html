@@ -181,7 +181,7 @@ form:has(#mqtt_enabled:checked) .mqtt-off{display:none}
           </select>
         </div>
       </div>
-      <p class="note">Over SSH: <code>journalctl -u applpi-app</code>.</p>
+      <p class="note">Over SSH: <code>journalctl -u juggle-app</code>.</p>
     </div>
     </div>
     <button type="submit" class="btn-full save" disabled>Save</button>
@@ -219,7 +219,7 @@ form:has(#mqtt_enabled:checked) .mqtt-off{display:none}
     </div>
     <div class="sec">Name and Setup Mode</div>
     <p class="note">The Pi's name, and its Wi-Fi when it can't reach this page, are changed in its setup mode: it
-      restarts with the ApplPi-SETUP Wi-Fi network and a setup page, for as long as set below, then carries on with its
+      restarts with the Juggle-SETUP Wi-Fi network and a setup page, for as long as set below, then carries on with its
       settings unless new ones are saved there.</p>
     <div class="buttons">
       <button type="button" class="btn-full quiet" data-setup-mode data-msg="wifi_msg" data-confirm="Restart the Pi into setup mode? This page goes away until it's back.">Rename (setup mode)…</button>
