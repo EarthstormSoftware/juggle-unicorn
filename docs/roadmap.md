@@ -31,7 +31,7 @@ As App Base's, with `mode` and `parameters`:
 | F1 Start | opcode 50 | As F1 starts since 2026: the panels flash blue for 5 s (pre-start), the five red lights come on a second apart, and after a random 0.2-3 s they go out; then off. (The 2015 script lit four pairs of columns and waited 4-7 s.) |
 | Pirate Flag | opcode 10 | The skull and crossbones, filling with red row by row, over and over |
 | CPU Chart | opcode 60 | An 8-column history of another device's CPU use (green, orange, red), from a field of its MQTT topic (the `chart` settings) |
-| Status | new | This Pi's temperature and load, and alerts other devices post to it (step 5) |
+| Status | new | After 1.0: this Pi's temperature and load, and alerts other devices post to it |
 
 Animations take a `speed` (1-10), as PlasmaStick's do. Home Assistant sees a light with RGB colour, colour
 temperature, brightness and the modes as effects.
@@ -86,8 +86,17 @@ README, tests, the first release, and a Pi running it.
 v0.1.0 (2026-10-27), on App Base v0.1.0. v0.2.0 (2026-10-27), on App Base v0.2.0: deploys over Wi-Fi, the
 Pi's clock and restarting the Pi from the page, and systemd's watchdog. It needs Juggle OS v0.4 (`rpi_ws281x`,
 `"pwm"` and the app requests). v0.3.0 (2026-10-28), on App Base v0.3.0: the Pi's name, the Wi-Fi fallback
-and a factory reset on the Device tab, with Juggle OS v0.5's setup mode. The repos stay private until the app contract is settled, near Juggle OS v1.
+and a factory reset on the Device tab, with Juggle OS v0.5's setup mode. v0.4.0 (2026-10-30): Juggle Unicorn, for
+Juggle OS. v0.5.0 (2026-11-01), on App Base 1.0 and Juggle OS 1.0: MQTT in snake_case, groups on home/group.
 
-### 6. Status and alerts
+### 6. 1.0
 
-This Pi's temperature and load as a mode, and alerts with more than a colour (an icon or a scrolling word).
+The modes above, alerts, the schedule and groups, on App Base 1.0 and Juggle OS 1.0 (decided 2026-11-01: the Status
+mode and richer alerts come after it). Checked on the HAT, then public: its history was checked for personal details
+first, and the Pi's own name taken out of it.
+
+## After 1.0
+
+- **Status**: this Pi's temperature and load as a mode, with alerts other devices post to it.
+- **Alerts with more than a colour**: an icon or a scrolling word, as optional alert fields in App Base (a 1.x
+  addition, which other lights ignore).

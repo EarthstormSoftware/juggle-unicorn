@@ -22,9 +22,9 @@ kept as a copy in `app/base/`.
 ## What it needs
 
 - A Raspberry Pi with a 40-pin header (developed on a Pi 2) and the original Unicorn HAT (not the HD or Mini).
-- **Juggle OS from the release after v0.6.0**: the first that knows `juggle` in `app.json` (Juggle 1.0, the app
-  contract). The library it needs, `rpi_ws281x`, and `"pwm": true` in `app.json`, with which the OS turns off the
-  onboard audio while the app runs (both use the PWM hardware), came in v0.4.
+- **Juggle OS 1.0** or a later 1.x (`"juggle": "1.0"` in `app.json`, the app contract). It has the library the app
+  needs, `rpi_ws281x`, and `"pwm": true`, with which the OS turns off the onboard audio while the app runs (both use
+  the PWM hardware).
 
 ## Deploying it
 
@@ -50,7 +50,7 @@ The Pi tries the new version and goes back to the old one if it doesn't keep run
 | Tab | Has |
 |---|---|
 | Control | The preview, power, brightness, the modes, speed, colour and white |
-| Device | The HAT's rotation and power limit, what it does at power-up, CPU Chart's topic, the web password, the log level, restart, restarting the Pi and reset; on Juggle OS v0.5 or later, the Pi's name, the Wi-Fi fallback and a factory reset |
+| Device | The HAT's rotation and power limit, what it does at power-up, CPU Chart's topic, the web password, the log level, restart, restarting the Pi and reset, the Pi's name and Wi-Fi (through setup mode), the Wi-Fi fallback and a factory reset |
 | MQTT | The broker, the topic base, the group, and Home Assistant discovery |
 | Schedule | The location (for sunrise and sunset), the events, and the Pi's clock: its time zone and time server |
 | Alert | The Alerts switch, Test and Stop, the alert's colour, timing and brightness, and the topic to watch |
