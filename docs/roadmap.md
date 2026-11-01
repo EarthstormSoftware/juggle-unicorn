@@ -21,11 +21,11 @@ sends those any more, so they aren't kept).
 
 ### Modes
 
-As PlasmaStick's, with `Mode` and `ModeParameters`:
+As App Base's, with `mode` and `parameters`:
 
 | Mode | From | Shows |
 |---|---|---|
-| Colour | opcodes 1-4 | The whole panel one colour, or a white by temperature (`Kelvin`) |
+| Colour | opcodes 1-4 | The whole panel one colour, or a white by temperature (`kelvin`) |
 | Rainbows | new | Rainbow colours moving across the grid |
 | Pulse | opcode 40 | A glow growing and shrinking from the centre, in a colour (purple by default) |
 | F1 Start | opcode 50 | As F1 starts since 2026: the panels flash blue for 5 s (pre-start), the five red lights come on a second apart, and after a random 0.2-3 s they go out; then off. (The 2015 script lit four pairs of columns and waited 4-7 s.) |
@@ -33,7 +33,7 @@ As PlasmaStick's, with `Mode` and `ModeParameters`:
 | CPU Chart | opcode 60 | An 8-column history of another device's CPU use (green, orange, red), from a field of its MQTT topic (the `chart` settings) |
 | Status | new | This Pi's temperature and load, and alerts other devices post to it (step 5) |
 
-Animations take a `Speed` (1-10), as PlasmaStick's do. Home Assistant sees a light with RGB colour, colour
+Animations take a `speed` (1-10), as PlasmaStick's do. Home Assistant sees a light with RGB colour, colour
 temperature, brightness and the modes as effects.
 
 ### Alerts
