@@ -828,7 +828,7 @@ var Base = (function () {
         'one on, or change its mode or colour, and the rest do the same. A mode another light doesn\'t have is ignored ' +
         'by it. Letters, digits, - and _.</p></div>' : '') +
       '<div class="group"><div class="sec">Home Assistant</div><label class="check"><input type="checkbox" name="mqtt.ha_discovery" id="ha_discovery"> ' +
-      'Announce ' + slot('ha-what', 'the device') + ' to Home Assistant</label><div class="frow"><div class="field"><label for="ha_prefix">Discovery Prefix</label>' +
+      '<span>Announce ' + slot('ha-what', 'the device') + ' to Home Assistant</span></label><div class="frow"><div class="field"><label for="ha_prefix">Discovery Prefix</label>' +
       '<input type="text" required name="mqtt.ha_prefix" id="ha_prefix" maxlength="100" placeholder="homeassistant" aria-describedby="ha_help" spellcheck="false" autocapitalize="off"></div></div>' +
       '<p class="note" id="ha_help">' + slot('ha-adds', 'Home Assistant adds it automatically (MQTT discovery).') +
       ' Turning this off removes it again. Only change the prefix if Home Assistant\'s has been changed.</p></div></div>' + SAVE + '</form>'];
