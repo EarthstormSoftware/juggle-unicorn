@@ -57,13 +57,13 @@ The Pi tries the new version and goes back to the old one if it doesn't keep run
 
 ## The API
 
-As PlasmaStick's, from App Base:
+From App Base, as every Earthstorm light's:
 
 | Request | Does |
 |---|---|
 | `GET /api/info` | The light, the HAT (`connected`, `limited`, `current_ma`), MQTT, the Pi and the OS |
 | `POST /api/power/on`, `/off`, `/toggle` | Turns the light on or off |
-| `POST /api/mode` | `{"mode": "Pulse", "parameters": {"Colour": "#00ff80", "Speed": 7}}` |
+| `POST /api/mode` | `{"mode": "Pulse", "parameters": {"colour": "#00ff80", "speed": 7}}` |
 | `POST /api/brightness` | `{"brightness": 40}` (1-100) |
 | `POST /api/alert` | Starts an alert, if alerts are on: `{}`, or any of `colour`, `seconds`, `on_ms`, `off_ms`, `brightness`; `"test": true` shows one with alerts off |
 | `POST /api/alert/stop` | Ends one |
@@ -73,24 +73,24 @@ As PlasmaStick's, from App Base:
 | `GET`, `POST /api/clock` | The Pi's time zone and time server |
 | `GET`, `POST /api/update` | How the last update went; a new version of the app, as a tar (what `deploy.ps1 -WiFi` sends) |
 | `POST /api/reboot` | Restarts the Pi |
-| `GET`, `POST /api/wifi` | The Wi-Fi fallback: setup mode when Wi-Fi doesn't connect (Juggle OS v0.5) |
+| `GET`, `POST /api/wifi` | The Wi-Fi fallback (setup mode when Wi-Fi doesn't connect), and a new network |
 | `POST /api/setup-mode`, `/api/factory-reset` | Restarts the Pi in setup mode, to rename it; forgets the Pi's settings and starts setup mode (both `{"confirm": true}`) |
 
 POSTs from other sites' pages are refused, and with a web password set every request needs it.
 
 ## MQTT
 
-Under the topic base (`/home/device/{name}` unless changed):
+Under the topic base (`home/device/{name}` unless changed):
 
 | Topic | Is |
 |---|---|
-| `<base>/control` | Commands, as PlasmaStick's: `{"MessageType": "StateChange", "Parameters": {"State": true}}`, `ModeChange` (`Mode`, `ModeParameters`) and `BrightnessChange` (`Brightness`) |
-| `<base>/state` | The state, retained: `{"State", "Mode", "ModeParameters", "Brightness"}` |
-| `<base>/alert` | Starts an alert (empty, or `{"Colour", "Seconds", "OnMs", "OffMs", "Brightness"}`); `{"Active": false}` ends one |
-| `<base>/alert/set`, `<base>/alert/state` | `{"Enabled": true}` switches alerts on; their state, retained |
+| `<base>/control` | Commands, as the state: any of `{"state": true, "mode": "Pulse", "parameters": {"speed": 7}, "brightness": 40}` |
+| `<base>/state` | The state, retained: `{"state", "mode", "parameters", "brightness"}` |
+| `<base>/alert` | Starts an alert (empty, or any of `{"colour", "seconds", "on_ms", "off_ms", "brightness"}`); `{"active": false}` ends one |
+| `<base>/alert/set`, `<base>/alert/state` | `{"enabled": true}` switches alerts on; their state (`{"enabled", "active"}`), retained |
 | `<base>/status`, `<base>/info` | `online` or `offline`, and the Pi's health every minute, retained |
 | `<base>/ha/state`, `<base>/ha/set` | Home Assistant's JSON light schema |
-| `earthstorm/group/<group>` | The group's state, and `plasmastick/group/<group>` until PlasmaStick is on App Base |
+| `home/group/<group>` | The group's state, as the state with `"from"`, retained |
 
 With discovery on, Home Assistant finds the light (with the modes as effects), an Alert button, an Alerts switch and
 the Pi's uptime, temperature, load and free memory.

@@ -50,7 +50,7 @@ class Pulse:
     def frame(self, now):
         if self.start is None:
             self.start = now
-        colour = rgb(self.parameters.get('Colour') or self.COLOUR)
+        colour = rgb(self.parameters.get('colour') or self.COLOUR)
         # Speed 5: a pulse every 0.8 s; the glow's width (at half strength) between 0.6 and 5 LEDs
         period = 4000 / self.light.speed()
         phase = ((now - self.start) % period) / period
