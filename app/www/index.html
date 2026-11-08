@@ -70,10 +70,10 @@ form:has(#mqtt_enabled:checked) .mqtt-off{display:none}
   <div class="crow" id="colour_row">
     <input type="color" id="colour" value="#ffb46b">
     <label for="colour" id="colour_text">Colour</label>
-    <button type="button" class="reset" id="default_btn" title="Return to the default colour">
+    <button type="button" class="reset" id="default_btn" title="Return to your default look">
       <span class="swatch" id="default_swatch"></span>Default
     </button>
-    <button type="button" class="reset" id="set_default_btn" title="Make the colour showing now the default">Set as default</button>
+    <button type="button" class="reset" id="set_default_btn" title="Make the look showing now your default">Set as default</button>
   </div>
   <div class="bright" id="white_row">
     <label for="kelvin" class="note" style="margin:0">White</label>
@@ -104,7 +104,21 @@ form:has(#mqtt_enabled:checked) .mqtt-off{display:none}
     </div>
     <div class="group">
       <div class="sec">At Power-up</div>
-      <label class="check"><input type="checkbox" name="device.default_state" id="default_state"> Turn the light on</label>
+      <div class="frow">
+        <div class="field"><label for="power_on">When the Power Comes On</label>
+          <select name="device.power_on" id="power_on" aria-describedby="power_on_help">
+            <option value="restore">As it went off</option>
+            <option value="on">On, with its last look</option>
+            <option value="off">Off</option>
+            <option value="default">On, with your default</option>
+          </select>
+        </div>
+      </div>
+      <p class="note" id="power_on_help">A restart or an update always brings the light back as it was.</p>
+    </div>
+    <div class="group">
+      <div class="sec">Your Default</div>
+      <p class="note">What the Default button goes back to. Set as default, beside it, saves the whole look showing, with its speed and options.</p>
       <div class="frow">
         <div class="field"><label for="default_mode">Mode</label>
           <select name="device.default_mode" id="default_mode"></select>
@@ -113,6 +127,14 @@ form:has(#mqtt_enabled:checked) .mqtt-off{display:none}
           <input type="number" required name="device.default_brightness" id="default_brightness" min="1" max="100">
         </div>
       </div>
+      <div class="frow">
+        <div class="field"><label for="default_colour">Colour</label>
+          <input type="color" name="device.default_colour" id="default_colour" value="#ffb46b">
+        </div>
+      </div>
+    </div>
+    <div class="group">
+      <div class="sec">Animations and Fades</div>
       <div class="frow">
         <div class="field"><label for="effect_speed">Animation Speed (1-10)</label>
           <input type="number" required name="device.effect_speed" id="effect_speed" min="1" max="10" aria-describedby="speed_help">
@@ -125,11 +147,6 @@ form:has(#mqtt_enabled:checked) .mqtt-off{display:none}
         </div>
       </div>
       <p class="note" id="fade_help">Turning on and off, and changing brightness or colour, fade over this time. 0: instant. Home Assistant can ask for its own.</p>
-      <div class="frow">
-        <div class="field"><label for="default_colour">Colour</label>
-          <input type="color" name="device.default_colour" id="default_colour" value="#ffb46b">
-        </div>
-      </div>
     </div>
     <div class="group">
       <div class="sec">CPU Chart</div>

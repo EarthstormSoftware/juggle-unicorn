@@ -50,7 +50,7 @@ The Pi tries the new version and goes back to the old one if it doesn't keep run
 | Tab | Has |
 |---|---|
 | Control | The preview, power, brightness, the modes, speed, colour and white |
-| Device | The HAT's rotation and power limit, what it does at power-up, CPU Chart's topic, the web password, the log level, restart, restarting the Pi and reset, the Pi's name and Wi-Fi (through setup mode), the Wi-Fi fallback and a factory reset |
+| Device | The HAT's rotation and power limit, what it does when the power comes on, your default look, CPU Chart's topic, the web password, the log level, restart, restarting the Pi and reset, the Pi's name and Wi-Fi (through setup mode), the Wi-Fi fallback and a factory reset |
 | MQTT | The broker, the topic base, the group, and Home Assistant discovery |
 | Schedule | The location (for sunrise and sunset), the events, and the Pi's clock: its time zone and time server |
 | Alert | The Alerts switch, Test and Stop, the alert's colour, timing and brightness, and the topic to watch |
@@ -65,6 +65,7 @@ From App Base, as every Earthstorm light's:
 | `POST /api/power/on`, `/off`, `/toggle` | Turns the light on or off |
 | `POST /api/mode` | `{"mode": "Pulse", "parameters": {"colour": "#00ff80", "speed": 7}}` |
 | `POST /api/brightness` | `{"brightness": 40}` (1-100) |
+| `POST /api/default`, `/api/default/save` | Back to your default look; makes the look showing now your default |
 | `POST /api/alert` | Starts an alert, if alerts are on: `{}`, or any of `colour`, `seconds`, `on_ms`, `off_ms`, `brightness`; `"test": true` shows one with alerts off |
 | `POST /api/alert/stop` | Ends one |
 | `GET /api/pixels` | What the HAT shows: 64 `#rrggbb` in reading order |
