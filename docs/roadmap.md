@@ -87,7 +87,9 @@ v0.1.0 (2026-10-27), on App Base v0.1.0. v0.2.0 (2026-10-27), on App Base v0.2.0
 Pi's clock and restarting the Pi from the page, and systemd's watchdog. It needs Juggle OS v0.4 (`rpi_ws281x`,
 `"pwm"` and the app requests). v0.3.0 (2026-10-28), on App Base v0.3.0: the Pi's name, the Wi-Fi fallback
 and a factory reset on the Device tab, with Juggle OS v0.5's setup mode. v0.4.0 (2026-10-30): Juggle Unicorn, for
-Juggle OS. v0.5.0 (2026-11-01), on App Base 1.0 and Juggle OS 1.0: MQTT in snake_case, groups on home/group.
+Juggle OS. v0.5.0 (2026-11-01), on App Base 1.0 and Juggle OS 1.0: MQTT in snake_case, groups on home/group. v1.0.0
+(2026-11-01). v1.1.0 (2026-11-20), on App Base 1.1: the light comes back as it went off after a power cut, a choice
+for when the power comes on, and your own default look.
 
 ### 6. 1.0
 
